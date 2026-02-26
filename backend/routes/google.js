@@ -16,10 +16,16 @@ const oAuth2Client = new OAuth2Client(
 // @access  Private
 router.post('/save-tokens', auth, async (req, res) => {
     try {
+        console.log('🔑 Intento de vincular Google recibido');
         const { code } = req.body;
-        if (!code) return res.status(400).json({ msg: 'Código no proporcionado' });
+        if (!code) {
+            console.log('⚠️ No se proporcionó código en el body');
+            return res.status(400).json({ msg: 'Código no proporcionado' });
+        }
 
+        console.log('🔄 Intercambiando código por tokens...');
         const { tokens } = await oAuth2Client.getToken(code);
+        console.log('✅ Tokens obtenidos exitosamente');
 
         const userId = parseInt(req.usuario.id);
         const updates = [];
@@ -41,12 +47,17 @@ router.post('/save-tokens', auth, async (req, res) => {
         if (updates.length > 0) {
             params.push(userId);
             await db.prepare(`UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+            console.log(`📝 Datos de Google actualizados para usuario ${userId}`);
         }
 
         res.json({ msg: 'Tokens guardados con éxito' });
     } catch (error) {
-        console.error('Error al guardar tokens:', error);
-        res.status(500).json({ msg: 'Error al vincular cuenta de Google' });
+        console.error('❌ Error detallado al guardar tokens Google:', error);
+        res.status(500).json({
+            msg: 'Error al vincular cuenta de Google',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
