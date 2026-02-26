@@ -395,6 +395,48 @@ const ProspectorProspectos = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Modal Preview Importar CSV */}
+                {previewImport && (
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-2xl w-full shadow-2xl max-h-[80vh] flex flex-col">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-white">Vista Previa - Importar CSV</h2>
+                                <button onClick={() => setPreviewImport(null)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+                            </div>
+                            <p className="text-sm text-gray-400 mb-3">
+                                <span className="text-green-400 font-bold">{previewImport.rows.filter(r => !r._error).length} validos</span>
+                                {previewImport.errores > 0 && <span className="text-red-400 font-bold ml-3">{previewImport.errores} con error</span>}
+                            </p>
+                            <div className="overflow-y-auto flex-1 border border-gray-700 rounded-lg">
+                                <table className="w-full text-xs">
+                                    <thead className="bg-gray-800 sticky top-0"><tr>
+                                        <th className="text-left p-2 text-gray-400">Nombre</th>
+                                        <th className="text-left p-2 text-gray-400">Telefono</th>
+                                        <th className="text-left p-2 text-gray-400">Empresa</th>
+                                        <th className="text-left p-2 text-gray-400">Estado</th>
+                                    </tr></thead>
+                                    <tbody className="divide-y divide-gray-800">
+                                        {previewImport.rows.map((r, i) => (
+                                            <tr key={i} className={r._error ? "bg-red-900/20" : "hover:bg-gray-800/30"}>
+                                                <td className="p-2 text-white">{r.nombres} {r.apellidoPaterno}</td>
+                                                <td className="p-2 text-gray-300">{r.telefono}</td>
+                                                <td className="p-2 text-gray-400">{r.empresa || "—"}</td>
+                                                <td className="p-2">{r._error ? <span className="text-red-400">Error: {r._error}</span> : <span className="text-green-400">OK</span>}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="flex gap-3 mt-4">
+                                <button onClick={() => setPreviewImport(null)} className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold">Cancelar</button>
+                                <button onClick={confirmarImport} disabled={importando || previewImport.rows.filter(r => !r._error).length === 0} className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold disabled:opacity-50">
+                                    {importando ? "Importando..." : `Importar ${previewImport.rows.filter(r => !r._error).length} prospectos`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
