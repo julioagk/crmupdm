@@ -12,18 +12,23 @@ const app = express();
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
+
     // Preflight
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
     }
-    
+
     next();
 });
 
 // Middleware CORS adicional
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token'],
+    exposedHeaders: ['x-auth-token']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -43,7 +48,7 @@ app.use('/api/google', require('./routes/google'));
 
 // Ruta de prueba API
 app.get('/api', (req, res) => {
-    res.json({ 
+    res.json({
         mensaje: '🚀 API CRM Infiniguard SYS funcionando correctamente',
         env: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString()
@@ -71,7 +76,7 @@ app.get('*', (req, res) => {
 // Manejo de errores global
 app.use((err, req, res, next) => {
     console.error('❌ Error:', err.message);
-    res.status(500).json({ 
+    res.status(500).json({
         mensaje: 'Error interno del servidor',
         error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });

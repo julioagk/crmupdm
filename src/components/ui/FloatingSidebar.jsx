@@ -17,8 +17,8 @@ const FloatingSidebar = ({ menuItems, userInfo, title = 'CRM', logo, onCollapseC
         if (onCollapseChange) onCollapseChange(newState);
     };
 
-    const toggleAccordion = (index) => {
-        setOpenAccordions(prev => ({ ...prev, [index]: !prev[index] }));
+    const toggleAccordion = (identifier) => {
+        setOpenAccordions(prev => ({ ...prev, [identifier]: !prev[identifier] }));
     };
 
     // Estilos dinámicos
@@ -108,11 +108,11 @@ const FloatingSidebar = ({ menuItems, userInfo, title = 'CRM', logo, onCollapseC
                 <div className="space-y-1">
                     {menuItems.filter(i => !i.isBottom).map((item, index) => {
                         if (item.isAccordion) {
-                            const isOpen = openAccordions[index];
+                            const isOpen = openAccordions[item.name];
                             return (
                                 <div key={index}>
                                     <button
-                                        onClick={() => !isCollapsed && toggleAccordion(index)}
+                                        onClick={() => !isCollapsed && toggleAccordion(item.name)}
                                         className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${inactiveClasses} ${hoverClasses}`}
                                         title={isCollapsed ? item.name : ''}
                                     >
@@ -161,6 +161,41 @@ const FloatingSidebar = ({ menuItems, userInfo, title = 'CRM', logo, onCollapseC
                 {/* Bottom items (Ajustes) */}
                 <div className={`space-y-1 pt-2 mt-2 border-t ${borderClass}`}>
                     {menuItems.filter(i => i.isBottom).map((item, index) => {
+                        if (item.isAccordion) {
+                            const isOpen = openAccordions[item.name];
+                            return (
+                                <div key={`bot-${index}`}>
+                                    <button
+                                        onClick={() => !isCollapsed && toggleAccordion(item.name)}
+                                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${inactiveClasses} ${hoverClasses}`}
+                                        title={isCollapsed ? item.name : ''}
+                                    >
+                                        <div className="flex-shrink-0">{item.icon}</div>
+                                        {!isCollapsed && (
+                                            <>
+                                                <span className="font-medium truncate flex-1 text-left">{item.name}</span>
+                                                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                            </>
+                                        )}
+                                    </button>
+                                    {!isCollapsed && isOpen && item.children && (
+                                        <div className="ml-4 mt-1 space-y-1">
+                                            {item.children.map((child, childIndex) => {
+                                                const isActive = location.pathname === child.path;
+                                                return (
+                                                    <Link key={childIndex} to={child.path}
+                                                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm ${isActive ? activeClasses : `${inactiveClasses} ${hoverClasses}`}`}
+                                                    >
+                                                        <div className="flex-shrink-0">{child.icon}</div>
+                                                        <span className="font-medium truncate">{child.name}</span>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
                         const isActive = location.pathname === item.path;
                         return (
                             <Link key={`bot-${index}`} to={item.path}

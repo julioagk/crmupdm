@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Phone, Calendar, TrendingUp, RefreshCw, Activity, Target, AlertCircle, CheckCircle2, X, ChevronRight, BarChart3, Eye, EyeOff } from 'lucide-react';
+import { Users, Phone, Calendar, TrendingUp, RefreshCw, Activity, Target, AlertCircle, CheckCircle2, X, ChevronRight, BarChart3, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -25,7 +25,9 @@ const CloserMonitoreoProspectors = () => {
                     tasas: { contacto: 53.3, agendamiento: 25.0 }
                 },
                 distribucion: { prospecto_nuevo: 20, en_contacto: 15, reunion_agendada: 10 },
-                rendimiento: { estado: 'excelente', color: 'green', descripcion: 'Rendimiento excelente - Cumpliendo metas' }
+                rendimiento: { estado: 'excelente', color: 'green', descripcion: 'Rendimiento excelente - Cumpliendo metas' },
+                detalleHoy: { llamadas: 15, llamadasExitosas: 8, mensajes: 2, citasAgendadas: 2, prospectosRegistrados: 5, estado: 'excelente', color: 'green' },
+                detalleSemana: { llamadas: 65, llamadasExitosas: 30, mensajes: 10, citasAgendadas: 9, prospectosRegistrados: 20, estado: 'excelente', color: 'green' }
             },
             {
                 prospector: { id: '2', nombre: 'María García', correo: 'maria@example.com' },
@@ -36,7 +38,9 @@ const CloserMonitoreoProspectors = () => {
                     tasas: { contacto: 50.0, agendamiento: 20.0 }
                 },
                 distribucion: { prospecto_nuevo: 18, en_contacto: 12, reunion_agendada: 8 },
-                rendimiento: { estado: 'bueno', color: 'yellow', descripcion: 'Buen rendimiento - En camino' }
+                rendimiento: { estado: 'bueno', color: 'yellow', descripcion: 'Buen rendimiento - En camino' },
+                detalleHoy: { llamadas: 8, llamadasExitosas: 3, mensajes: 1, citasAgendadas: 1, prospectosRegistrados: 2, estado: 'bueno', color: 'yellow' },
+                detalleSemana: { llamadas: 45, llamadasExitosas: 20, mensajes: 5, citasAgendadas: 5, prospectosRegistrados: 12, estado: 'bueno', color: 'yellow' }
             },
             {
                 prospector: { id: '3', nombre: 'Carlos López', correo: 'carlos@example.com' },
@@ -47,7 +51,9 @@ const CloserMonitoreoProspectors = () => {
                     tasas: { contacto: 40.0, agendamiento: 0 }
                 },
                 distribucion: { prospecto_nuevo: 15, en_contacto: 10, reunion_agendada: 5 },
-                rendimiento: { estado: 'bajo', color: 'orange', descripcion: 'Rendimiento bajo - Necesita atención' }
+                rendimiento: { estado: 'bajo', color: 'orange', descripcion: 'Rendimiento bajo - Necesita atención' },
+                detalleHoy: { llamadas: 2, llamadasExitosas: 0, mensajes: 0, citasAgendadas: 0, prospectosRegistrados: 0, estado: 'critico', color: 'red' },
+                detalleSemana: { llamadas: 15, llamadasExitosas: 5, mensajes: 2, citasAgendadas: 1, prospectosRegistrados: 4, estado: 'bajo', color: 'orange' }
             }
         ]
     };
@@ -99,6 +105,12 @@ const CloserMonitoreoProspectors = () => {
                 border: 'border-red-200',
                 text: 'text-red-700',
                 badge: 'bg-red-500 text-white',
+            },
+            gray: {
+                bg: 'bg-gray-50',
+                border: 'border-gray-200',
+                text: 'text-gray-700',
+                badge: 'bg-gray-500 text-white',
             }
         };
         return colors[color] || colors.green;
@@ -136,203 +148,138 @@ const CloserMonitoreoProspectors = () => {
     // Si hay un prospector seleccionado, mostrar vista de detalles expandida
     if (selectedProspector) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+            <div className="min-h-screen bg-gray-50 p-4">
                 <div className="max-w-7xl mx-auto">
                     {/* Header Expandido */}
-                    <div className={`${
-                        selectedProspector.rendimiento.color === 'green' ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-200' :
-                        selectedProspector.rendimiento.color === 'yellow' ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-200' :
-                        selectedProspector.rendimiento.color === 'orange' ? 'bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200' :
-                        'bg-gradient-to-r from-red-50 to-red-100 border-red-200'
-                    } border rounded-xl p-4 mb-4`}>
+                    <div className={`${selectedProspector.rendimiento.color === 'green' ? 'bg-green-50 border-green-200' :
+                        selectedProspector.rendimiento.color === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+                            selectedProspector.rendimiento.color === 'orange' ? 'bg-orange-50 border-orange-200' :
+                                'bg-red-50 border-red-200'
+                        } border rounded-xl p-4 mb-4`}>
                         <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-md border-3 border-white flex-shrink-0">
-                                        <Users className="w-7 h-7 text-gray-400" />
+                            <div className="flex-1 flex items-start gap-4">
+                                <button
+                                    onClick={() => setSelectedProspector(null)}
+                                    className="p-2 hover:bg-black/5 rounded-full transition-colors shrink-0 mt-1"
+                                    title="Volver al monitoreo"
+                                >
+                                    <ArrowLeft className="w-6 h-6 text-gray-600 hover:text-gray-900" />
+                                </button>
+
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-md border-3 border-white shrink-0">
+                                            <Users className="w-7 h-7 text-gray-400" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h1 className="text-2xl font-bold text-gray-900 truncate">{selectedProspector.prospector.nombre}</h1>
+                                            <p className="text-gray-600 text-xs truncate">{selectedProspector.prospector.correo}</p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <h1 className="text-2xl font-bold text-gray-900 truncate">{selectedProspector.prospector.nombre}</h1>
-                                        <p className="text-gray-600 text-xs truncate">{selectedProspector.prospector.correo}</p>
+                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 ml-[68px] ${selectedProspector.rendimiento.color === 'green' ? 'bg-green-500 text-white' :
+                                            selectedProspector.rendimiento.color === 'yellow' ? 'bg-yellow-500 text-white' :
+                                                selectedProspector.rendimiento.color === 'orange' ? 'bg-orange-500 text-white' :
+                                                    'bg-red-500 text-white'
+                                        } rounded-full text-xs font-bold shadow-md`}>
+                                        {getEstadoIcon(selectedProspector.rendimiento.estado)}
+                                        <span className="capitalize">{selectedProspector.rendimiento.estado.toUpperCase()}</span>
                                     </div>
-                                </div>
-                                <div className={`inline-flex items-center gap-1.5 px-3 py-1 ${
-                                    selectedProspector.rendimiento.color === 'green' ? 'bg-green-500 text-white' :
-                                    selectedProspector.rendimiento.color === 'yellow' ? 'bg-yellow-500 text-white' :
-                                    selectedProspector.rendimiento.color === 'orange' ? 'bg-orange-500 text-white' :
-                                    'bg-red-500 text-white'
-                                } rounded-full text-xs font-bold shadow-md`}>
-                                    {getEstadoIcon(selectedProspector.rendimiento.estado)}
-                                    <span className="capitalize">{selectedProspector.rendimiento.estado.toUpperCase()}</span>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setSelectedProspector(null)}
-                                className="p-2 hover:bg-white rounded-full transition-all shadow-md flex-shrink-0"
-                            >
-                                <X className="w-5 h-5 text-gray-700" />
-                            </button>
                         </div>
                     </div>
 
                     {/* Contenido Grid Compacto */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        {/* Columna Izquierda - Métricas Principales */}
-                        <div className="lg:col-span-2 space-y-4">
-                            {/* Métricas Rápidas - 2x2 */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <Phone className="w-5 h-5 text-blue-600" />
-                                        <span className="text-xs font-semibold text-blue-700 bg-white px-2 py-0.5 rounded-full">HOY</span>
-                                    </div>
-                                    <p className="text-3xl font-bold text-gray-900">3<span className="text-lg text-gray-500">/12</span></p>
-                                    <p className="text-xs text-blue-700 mt-1">Llamadas realizadas</p>
-                                </div>
-
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <Calendar className="w-5 h-5 text-green-600" />
-                                        <span className="text-xs font-semibold text-green-700 bg-white px-2 py-0.5 rounded-full">HOY</span>
-                                    </div>
-                                    <p className="text-3xl font-bold text-gray-900">1<span className="text-lg text-gray-500">/2</span></p>
-                                    <p className="text-xs text-green-700 mt-1">Citas agendadas</p>
-                                </div>
-
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <Users className="w-5 h-5 text-purple-600" />
-                                        <span className="text-xs font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-full">HOY</span>
-                                    </div>
-                                    <p className="text-3xl font-bold text-gray-900">5<span className="text-lg text-gray-500">/8</span></p>
-                                    <p className="text-xs text-purple-700 mt-1">Prospectos contactados</p>
-                                </div>
-
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <Target className="w-5 h-5 text-orange-600" />
-                                        <span className="text-xs font-semibold text-orange-700 bg-white px-2 py-0.5 rounded-full">HOY</span>
-                                    </div>
-                                    <p className="text-3xl font-bold text-gray-900">{(5/8*100).toFixed(0)}<span className="text-lg text-gray-500">%</span></p>
-                                    <p className="text-xs text-orange-700 mt-1">Tasa de contacto</p>
-                                </div>
-                            </div>
-
-                            {/* Tasas de Conversión de Hoy */}
-                            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                    <TrendingUp className="w-4 h-4 text-blue-600" />
-                                    Metas de Hoy
-                                </h3>
-                                <div className="space-y-2">
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-semibold text-gray-700">Contactos</span>
-                                            <span className="text-lg font-bold text-blue-600">5/8</span>
-                                        </div>
-                                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-500"
-                                                style={{ width: `${(5/8)*100}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-semibold text-gray-700">Citas Agendadas</span>
-                                            <span className="text-lg font-bold text-purple-600">1/2</span>
-                                        </div>
-                                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full transition-all duration-500"
-                                                style={{ width: `${(1/2)*100}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Columna Derecha - Distribución y Recomendaciones */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Columna Izquierda - HOY */}
                         <div className="space-y-4">
-                            {/* Distribución del Embudo */}
-                            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                    <BarChart3 className="w-4 h-4 text-green-600" />
-                                    Estado Hoy
-                                </h3>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                                        <div>
-                                            <p className="text-xs text-blue-700 font-semibold">En Inicio</p>
-                                            <p className="text-xl font-bold text-blue-900">3</p>
-                                        </div>
-                                        <div className="text-xl">📍</div>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-                                        <div>
-                                            <p className="text-xs text-yellow-700 font-semibold">En Llamadas</p>
-                                            <p className="text-xl font-bold text-yellow-900">2</p>
-                                        </div>
-                                        <div className="text-xl">📞</div>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
-                                        <div>
-                                            <p className="text-xs text-green-700 font-semibold">Conversiones</p>
-                                            <p className="text-xl font-bold text-green-900">1</p>
-                                        </div>
-                                        <div className="text-xl">✓</div>
-                                    </div>
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-blue-600" />
+                                Resumen de Hoy
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Llamadas */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Phone className="w-6 h-6 text-blue-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleHoy?.llamadas || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">LLAMADAS TOTALES</p>
+                                    <p className="text-blue-600 text-[10px] font-bold mt-1 bg-blue-50 px-2 py-0.5 rounded-full">{selectedProspector.detalleHoy?.llamadasExitosas || 0} EXITOSAS</p>
+                                </div>
+                                {/* Citas Agendadas */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Calendar className="w-6 h-6 text-purple-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleHoy?.citasAgendadas || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">CITAS AGENDADAS</p>
+                                </div>
+                                {/* Mensajes */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Users className="w-6 h-6 text-orange-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleHoy?.mensajes || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">MENSAJES ENVIADOS</p>
+                                </div>
+                                {/* Prospectos */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Target className="w-6 h-6 text-green-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleHoy?.prospectosRegistrados || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">PROSPECTOS REGIST.</p>
                                 </div>
                             </div>
 
-                            {/* Recomendaciones */}
-                            <div className={`${
-                                selectedProspector.rendimiento.color === 'green' ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' :
-                                selectedProspector.rendimiento.color === 'yellow' ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200' :
-                                selectedProspector.rendimiento.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200' :
-                                'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
-                            } border rounded-lg p-4 shadow-sm`}>
-                                <h4 className={`text-xs font-bold mb-2 flex items-center gap-1 ${
-                                    selectedProspector.rendimiento.color === 'green' ? 'text-green-700' :
-                                    selectedProspector.rendimiento.color === 'yellow' ? 'text-yellow-700' :
-                                    selectedProspector.rendimiento.color === 'orange' ? 'text-orange-700' :
-                                    'text-red-700'
-                                }`}>
-                                    <AlertCircle className="w-3 h-3" />
-                                    Estado de Hoy
+                            {/* Resultado del día */}
+                            <div className={`${getColorClasses(selectedProspector.detalleHoy?.color || 'gray').bg} border ${getColorClasses(selectedProspector.detalleHoy?.color || 'gray').border} rounded-xl p-4 shadow-sm text-center`}>
+                                <h4 className={`text-xs font-bold mb-1 flex items-center gap-1 ${getColorClasses(selectedProspector.detalleHoy?.color || 'gray').text}`}>
+                                    <AlertCircle className="w-3 h-3" /> Resultado del Día
                                 </h4>
-                                
-                                {(5/8) >= 0.75 && (
-                                    <div className="text-xs text-green-700 space-y-1 font-semibold">
-                                        <p>✓ Lleva buen ritmo</p>
-                                        <p>✓ Continúa así</p>
-                                    </div>
-                                )}
-                                {(5/8) >= 0.5 && (5/8) < 0.75 && (
-                                    <div className="text-xs text-yellow-700 space-y-1 font-semibold">
-                                        <p>→ Va por buen camino</p>
-                                        <p>→ Intensifica contactos</p>
-                                    </div>
-                                )}
-                                {(5/8) < 0.5 && (
-                                    <div className="text-xs text-orange-700 space-y-1 font-semibold">
-                                        <p>⚠ Necesita acelerar</p>
-                                        <p>⚠ 3 contactos más</p>
-                                    </div>
-                                )}
+                                <p className={`capitalize font-bold text-lg ${getColorClasses(selectedProspector.detalleHoy?.color || 'gray').text}`}>
+                                    {selectedProspector.detalleHoy?.estado || 'Sin Datos'}
+                                </p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Botón Cerrar */}
-                    <div className="flex justify-center mt-4">
-                        <button
-                            onClick={() => setSelectedProspector(null)}
-                            className="px-6 py-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold rounded-lg transition-all shadow-md text-sm"
-                        >
-                            ← Volver al Monitoreo
-                        </button>
+                        {/* Columna Derecha - SEMANA */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-purple-600" />
+                                Resumen de la Semana
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Llamadas */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Phone className="w-6 h-6 text-blue-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleSemana?.llamadas || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">LLAMADAS TOTALES</p>
+                                    <p className="text-blue-600 text-[10px] font-bold mt-1 bg-blue-50 px-2 py-0.5 rounded-full">{selectedProspector.detalleSemana?.llamadasExitosas || 0} EXITOSAS</p>
+                                </div>
+                                {/* Citas Agendadas */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Calendar className="w-6 h-6 text-purple-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleSemana?.citasAgendadas || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">CITAS AGENDADAS</p>
+                                </div>
+                                {/* Mensajes */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Users className="w-6 h-6 text-orange-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleSemana?.mensajes || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">MENSAJES ENVIADOS</p>
+                                </div>
+                                {/* Prospectos */}
+                                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col items-center justify-center text-center">
+                                    <Target className="w-6 h-6 text-green-600 mb-2" />
+                                    <p className="text-3xl font-bold text-gray-900 leading-none">{selectedProspector.detalleSemana?.prospectosRegistrados || 0}</p>
+                                    <p className="text-gray-600 text-[11px] font-semibold mt-1">PROSPECTOS REGIST.</p>
+                                </div>
+                            </div>
+
+                            {/* Resultado Semana */}
+                            <div className={`${getColorClasses(selectedProspector.detalleSemana?.color || 'gray').bg} border ${getColorClasses(selectedProspector.detalleSemana?.color || 'gray').border} rounded-xl p-4 shadow-sm text-center`}>
+                                <h4 className={`text-xs font-bold mb-1 flex items-center gap-1 ${getColorClasses(selectedProspector.detalleSemana?.color || 'gray').text}`}>
+                                    <AlertCircle className="w-3 h-3" /> Resultado de la Semana
+                                </h4>
+                                <p className={`capitalize font-bold text-lg ${getColorClasses(selectedProspector.detalleSemana?.color || 'gray').text}`}>
+                                    {selectedProspector.detalleSemana?.estado || 'Sin Datos'}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -468,7 +415,7 @@ const CloserMonitoreoProspectors = () => {
                                             <h3 className="text-lg font-bold text-gray-900 truncate">{item.prospector.nombre}</h3>
                                             <p className="text-gray-600 text-xs truncate">{item.prospector.correo}</p>
                                         </div>
-                                        <div className={`flex items-center gap-1 px-2 py-1 ${colorClasses.badge} rounded-lg shadow-sm ml-2 flex-shrink-0`}>
+                                        <div className={`flex items-center gap-1 px-2 py-1 ${colorClasses.badge} rounded-lg shadow-sm ml-2 shrink-0`}>
                                             {getEstadoIcon(item.rendimiento.estado)}
                                             <span className="font-semibold capitalize text-xs">{item.rendimiento.estado}</span>
                                         </div>

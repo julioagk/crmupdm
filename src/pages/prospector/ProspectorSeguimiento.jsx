@@ -857,7 +857,7 @@ const ProspectorSeguimiento = () => {
                                         {/* Paso 3a: Llamar después — marcar fecha */}
                                         {llamadaFlow.paso === 'llamarDespues' && (
                                             <div className="space-y-3">
-                                                <p className="font-semibold text-gray-800 text-blue-700">📅 ¿Cuándo le llamamos?</p>
+                                                <p className="font-semibold text-blue-700">📅 ¿Cuándo le llamamos?</p>
                                                 <input
                                                     type="datetime-local"
                                                     value={llamadaFlow.fechaProxima}

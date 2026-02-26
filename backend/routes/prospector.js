@@ -29,8 +29,9 @@ function calcularPeriodoActividades(db, prospectorId, filtroFecha) {
 
 function calcularPeriodoClientes(db, prospectorId, filtroFechaRegistro) {
     const where = filtroFechaRegistro ? `AND ${filtroFechaRegistro}` : '';
+    // Excluir prospectos perdidos y ventas ganadas del conteo de "prospectos nuevos"
     return db.prepare(
-        `SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? ${where}`
+        `SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo NOT IN ('perdido', 'venta_ganada') ${where}`
     ).get(prospectorId)?.c || 0;
 }
 
@@ -50,21 +51,58 @@ router.get('/dashboard', [auth, esProspector], async (req, res) => {
             'SELECT * FROM clientes WHERE prospectorAsignado = ?'
         ).all(prospectorId);
 
-        // Embudo siempre sobre totales
+        // Filtrar solo prospectos activos (excluir perdidos y ventas ganadas)
+        const clientesActivos = clientes.filter(c => 
+            c.etapaEmbudo !== 'perdido' && c.etapaEmbudo !== 'venta_ganada'
+        );
+
+        // Embudo siempre sobre totales (Acumulativo)
         const embudo = {
-            total: clientes.length,
-            prospecto_nuevo: clientes.filter(c => c.etapaEmbudo === 'prospecto_nuevo').length,
-            en_contacto: clientes.filter(c => c.etapaEmbudo === 'en_contacto').length,
-            reunion_agendada: clientes.filter(c => c.etapaEmbudo === 'reunion_agendada').length,
-            transferidos: clientes.filter(c => c.closerAsignado).length
+            total: clientesActivos.length,
+            prospecto_nuevo: 0,
+            en_contacto: 0,
+            reunion_agendada: 0,
+            transferidos: 0
         };
+
+        for (const c of clientesActivos) {
+            embudo.prospecto_nuevo++; // Todos empiezan como prospecto
+
+            let contactado = false;
+            let agendado = false;
+            let transferido = !!c.closerAsignado;
+
+            // Etapas que implican contacto
+            const etapasContacto = ['en_contacto', 'reunion_agendada', 'venta_ganada', 'en_negociacion', 'reunion_realizada', 'perdido'];
+            // Etapas que implican reunión agendada
+            const etapasAgendado = ['reunion_agendada', 'venta_ganada', 'en_negociacion', 'reunion_realizada'];
+
+            if (c.etapaEmbudo !== 'prospecto_nuevo' && c.etapaEmbudo) contactado = true;
+            if (etapasAgendado.includes(c.etapaEmbudo) || transferido) {
+                contactado = true;
+                agendado = true;
+            }
+
+            // Historial por si fue regresado a alguna etapa
+            const hist = c.historialEmbudo ? JSON.parse(c.historialEmbudo) : [];
+            const etapasHist = hist.map(h => h.etapa);
+            if (etapasHist.some(e => etapasContacto.includes(e))) contactado = true;
+            if (etapasHist.some(e => etapasAgendado.includes(e))) {
+                contactado = true;
+                agendado = true;
+            }
+
+            if (contactado) embudo.en_contacto++;
+            if (agendado) embudo.reunion_agendada++;
+            if (transferido) embudo.transferidos++;
+        }
 
         const tasasConversion = {
             contacto: embudo.total > 0
-                ? ((embudo.en_contacto + embudo.reunion_agendada) / embudo.total * 100).toFixed(1)
+                ? (embudo.en_contacto / embudo.total * 100).toFixed(1)
                 : 0,
-            agendamiento: (embudo.en_contacto + embudo.reunion_agendada) > 0
-                ? (embudo.reunion_agendada / (embudo.en_contacto + embudo.reunion_agendada) * 100).toFixed(1)
+            agendamiento: embudo.en_contacto > 0
+                ? (embudo.reunion_agendada / embudo.en_contacto * 100).toFixed(1)
                 : 0
         };
 
@@ -121,8 +159,8 @@ router.get('/prospectos', [auth, esProspector], async (req, res) => {
         const prospectorId = parseInt(req.usuario.id);
         const { etapa, busqueda } = req.query;
 
-        let sql = 'SELECT c.*, u.nombre as closerNombre FROM clientes c LEFT JOIN usuarios u ON c.closerAsignado = u.id WHERE c.prospectorAsignado = ? AND c.etapaEmbudo != ?';
-        const params = [prospectorId, 'venta_ganada'];
+        let sql = 'SELECT c.*, u.nombre as closerNombre FROM clientes c LEFT JOIN usuarios u ON c.closerAsignado = u.id WHERE c.prospectorAsignado = ? AND c.etapaEmbudo NOT IN (?, ?)';
+        const params = [prospectorId, 'venta_ganada', 'perdido'];
 
         if (etapa && etapa !== 'todos') {
             sql += ' AND c.etapaEmbudo = ?';
@@ -242,12 +280,12 @@ router.post('/registrar-actividad', [auth, esProspector], async (req, res) => {
             return res.status(404).json({ msg: 'Cliente no encontrado' });
         }
         const prospectorId = parseInt(req.usuario.id);
-        
+
         // MEJORADO: Permitir que prospector registre actividades ANTES y DURANTE la transferencia
         // Si es prospector, debe estar asignado. Si es closer, puede registrar en clientes asignados a él
         const esProspectorAsignado = cliente.prospectorAsignado === prospectorId && String(req.usuario.rol).toLowerCase() === 'prospector';
         const esCloserDelCliente = cliente.closerAsignado === prospectorId && String(req.usuario.rol).toLowerCase() === 'closer';
-        
+
         if (!esProspectorAsignado && !esCloserDelCliente) {
             return res.status(403).json({ msg: 'No tienes permiso para registrar actividades de este cliente' });
         }
@@ -287,22 +325,22 @@ router.get('/prospecto/:id/historial-completo', [auth, esProspector], async (req
     try {
         const prospectoId = parseInt(req.params.id);
         const usuarioId = parseInt(req.usuario.id);
-        
+
         // Obtener cliente
         const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
         if (!cliente) {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
-        
+
         // Validar permisos: el prospector o closer asignado pueden ver el historial
         const esProspectorAsignado = cliente.prospectorAsignado === usuarioId;
         const esCloserAsignado = cliente.closerAsignado === usuarioId;
         const esProspectorActual = String(req.usuario.rol).toLowerCase() === 'prospector';
-        
+
         if (!esProspectorAsignado && !esCloserAsignado) {
             return res.status(403).json({ msg: 'No tienes permiso para ver este historial' });
         }
-        
+
         // Obtener TODAS las actividades del cliente (de todos los vendedores que han trabajado en él)
         const actividades = db.prepare(`
             SELECT a.*, u.nombre as vendedorNombre, u.rol as vendedorRol
@@ -311,25 +349,35 @@ router.get('/prospecto/:id/historial-completo', [auth, esProspector], async (req
             WHERE a.cliente = ?
             ORDER BY a.fecha ASC
         `).all(prospectoId);
-        
+
         // Obtener historial del embudo
         const historialEmbudo = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
-        
+
         // Construir respuesta enriquecida
         const timeline = [];
+
+        // Agregar cambios de etapa (FILTRAR los redundantes con actividades de cita)
+        // Las etapas de reunion_agendada y reunion_realizada ya se muestran como actividades tipo 'cita'
+        const etapasRelacionadasConCitas = ['reunion_agendada', 'reunion_realizada'];
         
-        // Agregar cambios de etapa
         historialEmbudo.forEach(h => {
-            timeline.push({
-                tipo: 'cambio_etapa',
-                etapa: h.etapa,
-                fecha: h.fecha,
-                vendedorId: h.vendedor,
-                descripcion: h.descripcion || `Cambio a etapa: ${h.etapa}`,
-                resultado: h.resultado || null
-            });
+            // Solo agregar cambios de etapa que NO sean redundantes con actividades de cita
+            const esRedundante = etapasRelacionadasConCitas.includes(h.etapa) && 
+                                 actividades.some(a => a.tipo === 'cita' && 
+                                                      Math.abs(new Date(a.fecha) - new Date(h.fecha)) < 60000); // 1 minuto tolerancia
+            
+            if (!esRedundante) {
+                timeline.push({
+                    tipo: 'cambio_etapa',
+                    etapa: h.etapa,
+                    fecha: h.fecha,
+                    vendedorId: h.vendedor,
+                    descripcion: h.descripcion || `Cambio a etapa: ${h.etapa}`,
+                    resultado: h.resultado || null
+                });
+            }
         });
-        
+
         // Agregar actividades
         actividades.forEach(a => {
             const mongoAct = toMongoFormat(a);
@@ -346,10 +394,10 @@ router.get('/prospecto/:id/historial-completo', [auth, esProspector], async (req
                 notas: a.notas
             });
         });
-        
+
         // Ordenar por fecha
         timeline.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-        
+
         res.json({
             cliente: toMongoFormat(cliente) || cliente,
             timeline,
@@ -591,7 +639,7 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
         db.prepare(`
             INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas, cambioEtapa, etapaAnterior, etapaNueva)
             VALUES (?, ?, ?, ?, ?, 'pendiente', ?, 1, 'en_contacto', 'reunion_agendada')
-        `).run('cita', closerIdNum, cid, fechaReunionISO, `Reunión agendada por prospector ${req.usuario.nombre}`, notas || '');
+        `).run('cita', prospectorId, cid, fechaReunionISO, `Reunión agendada por prospector ${req.usuario.nombre} → Asignada a closer`, notas || '');
 
         const clienteActualizado = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
         const actividadRow = db.prepare('SELECT * FROM actividades WHERE cliente = ? ORDER BY id DESC LIMIT 1').get(cid);
@@ -615,22 +663,27 @@ router.get('/estadisticas', [auth, esProspector], async (req, res) => {
         const clientes = db.prepare('SELECT * FROM clientes WHERE prospectorAsignado = ?').all(prospectorId);
         const actividades = db.prepare('SELECT * FROM actividades WHERE vendedor = ?').all(prospectorId);
 
+        // Filtrar solo clientes activos (excluir perdidos y ventas ganadas)
+        const clientesActivos = clientes.filter(c => 
+            c.etapaEmbudo !== 'perdido' && c.etapaEmbudo !== 'venta_ganada'
+        );
+
         const llamadas = actividades.filter(a => a.tipo === 'llamada');
         const llamadasExitosas = llamadas.filter(a => a.resultado === 'exitoso');
-        const reunionesAgendadas = clientes.filter(c => c.etapaEmbudo === 'reunion_agendada' || c.closerAsignado);
+        const reunionesAgendadas = clientesActivos.filter(c => c.etapaEmbudo === 'reunion_agendada' || c.closerAsignado);
 
         const tasaContacto = llamadas.length > 0 ? (llamadasExitosas.length / llamadas.length * 100).toFixed(1) : 0;
         const tasaAgendamiento = llamadasExitosas.length > 0 ? (reunionesAgendadas.length / llamadasExitosas.length * 100).toFixed(1) : 0;
 
         const distribucion = {
-            prospecto_nuevo: clientes.filter(c => c.etapaEmbudo === 'prospecto_nuevo').length,
-            en_contacto: clientes.filter(c => c.etapaEmbudo === 'en_contacto').length,
-            reunion_agendada: clientes.filter(c => c.etapaEmbudo === 'reunion_agendada').length,
+            prospecto_nuevo: clientesActivos.filter(c => c.etapaEmbudo === 'prospecto_nuevo').length,
+            en_contacto: clientesActivos.filter(c => c.etapaEmbudo === 'en_contacto').length,
+            reunion_agendada: clientesActivos.filter(c => c.etapaEmbudo === 'reunion_agendada').length,
             transferidos: reunionesAgendadas.length
         };
 
         res.json({
-            totalClientes: clientes.length,
+            totalClientes: clientesActivos.length,
             totalLlamadas: llamadas.length,
             llamadasExitosas: llamadasExitosas.length,
             reunionesAgendadas: reunionesAgendadas.length,
@@ -672,8 +725,8 @@ router.post('/pasar-a-cliente/:id', [auth, esProspector], async (req, res) => {
         const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
         hist.push({ etapa: 'venta_ganada', fecha: now, vendedor: prospectorId });
 
-        db.prepare('UPDATE clientes SET etapaEmbudo = ?, fechaUltimaEtapa = ?, ultimaInteraccion = ?, historialEmbudo = ? WHERE id = ?')
-            .run('venta_ganada', now, now, JSON.stringify(hist), clienteId);
+        db.prepare('UPDATE clientes SET etapaEmbudo = ?, estado = ?, fechaUltimaEtapa = ?, ultimaInteraccion = ?, historialEmbudo = ? WHERE id = ?')
+            .run('venta_ganada', 'ganado', now, now, JSON.stringify(hist), clienteId);
 
         res.json({ msg: '✓ Prospecto convertido a cliente' });
     } catch (error) {
@@ -746,8 +799,8 @@ router.get('/estadisticas', [auth, esProspector], async (req, res) => {
 
         // Clientes totales
         const ClientesTotales = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ?').get(prospectorId).c || 0;
-        const clientesHoy = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND fechaRegistro >= ? AND fechaRegistro < ?')
-            .get(prospectorId, hoy.toISOString(), ahora.toISOString()).c || 0;
+        const clientesHoy = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND date(fechaRegistro) = date(?)')
+            .get(prospectorId, hoy.toISOString()).c || 0;
 
         // Actividades hoy
         const actividadesHoy = getActividades(hoy, new Date(hoy.getTime() + 24 * 60 * 60 * 1000));
@@ -773,18 +826,18 @@ router.get('/estadisticas', [auth, esProspector], async (req, res) => {
         // Citas agendadas
         const citasAgendadasMes = db.prepare(`
             SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? 
-            AND etapaEmbudo = 'reunion_agendada' AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa < ?
+            AND etapaEmbudo = 'reunion_agendada' AND date(fechaUltimaEtapa) >= date(?) AND date(fechaUltimaEtapa) <= date(?)
         `).get(prospectorId, inicioMes.toISOString(), finMes.toISOString()).c || 0;
 
         const citasAgendadasMesAnterior = db.prepare(`
             SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? 
-            AND etapaEmbudo = 'reunion_agendada' AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa < ?
+            AND etapaEmbudo = 'reunion_agendada' AND date(fechaUltimaEtapa) >= date(?) AND date(fechaUltimaEtapa) <= date(?)
         `).get(prospectorId, inicioMesAnterior.toISOString(), finMesAnterior.toISOString()).c || 0;
 
         // Transferencias
         const transferidosMes = db.prepare(`
             SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? 
-            AND closerAsignado IS NOT NULL AND fechaTransferencia >= ? AND fechaTransferencia < ?
+            AND closerAsignado IS NOT NULL AND date(fechaTransferencia) >= date(?) AND date(fechaTransferencia) <= date(?)
         `).get(prospectorId, inicioMes.toISOString(), finMes.toISOString()).c || 0;
 
         // Distribución actual

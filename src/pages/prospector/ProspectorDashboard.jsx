@@ -123,8 +123,8 @@ const ProspectorDashboard = () => {
                                     key={p.key}
                                     onClick={() => setPeriodo(p.key)}
                                     className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${periodo === p.key
-                                            ? 'bg-white text-[#0d9488] shadow-sm border border-gray-200'
-                                            : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white text-[#0d9488] shadow-sm border border-gray-200'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     {p.label}
@@ -145,12 +145,12 @@ const ProspectorDashboard = () => {
                             stages={[
                                 {
                                     etapa: 'Prospectos',
-                                    cantidad: data.embudo.prospecto_nuevo,
+                                    cantidad: data.embudo.total,
                                     color: 'bg-blue-500',
                                     contadorHoy: data.periodos?.dia?.prospectos ?? 0,
                                     labelContador: 'recibidos hoy',
                                     cantidadExito: data.embudo.en_contacto,
-                                    cantidadPerdida: data.embudo.prospecto_nuevo - data.embudo.en_contacto,
+                                    cantidadPerdida: data.embudo.total - data.embudo.en_contacto,
                                     porcentajeExito: data.tasasConversion.contacto,
                                     porcentajePerdida: (100 - data.tasasConversion.contacto).toFixed(1),
                                     labelExito: 'contactados',
@@ -160,6 +160,8 @@ const ProspectorDashboard = () => {
                                     etapa: 'Llamadas/Contacto',
                                     cantidad: data.embudo.en_contacto,
                                     color: 'bg-teal-500',
+                                    contadorHoy: data.periodos?.dia?.llamadas ?? 0,
+                                    labelContador: 'llamadas hoy',
                                     cantidadExito: data.embudo.reunion_agendada,
                                     cantidadPerdida: data.embudo.en_contacto - data.embudo.reunion_agendada,
                                     porcentajeExito: data.tasasConversion.agendamiento,
@@ -171,6 +173,8 @@ const ProspectorDashboard = () => {
                                     etapa: 'Citas Agendadas',
                                     cantidad: data.embudo.reunion_agendada,
                                     color: 'bg-green-500',
+                                    contadorHoy: data.periodos?.dia?.reuniones ?? 0,
+                                    labelContador: 'agendadas hoy',
                                     cantidadExito: data.embudo.reunion_agendada,
                                     porcentajeExito: 100,
                                     labelExito: 'transferidas'
@@ -236,44 +240,81 @@ const ProspectorDashboard = () => {
                     <div className="lg:col-span-2 flex flex-col min-h-0">
                         <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col overflow-hidden">
                             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2 flex-shrink-0">
-                                <Target className="w-6 h-6 text-green-600" />
-                                Tareas Pendientes
+                                <Target className="w-6 h-6 text-[#0d9488]" />
+                                Metas y Recordatorios
                             </h2>
 
-                            <div className="flex-1 space-y-4 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#14b8a6 #f3f4f6' }}>
+                            <div className="flex-1 space-y-3 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#3b82f6 #f3f4f6' }}>
+                                {/* METAS EN MODO STACK */}
+                                <div className="space-y-3 mb-6">
+                                    {/* Meta 12 llamadas diarias */}
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm">
+                                        <div className="flex justify-between items-center text-xs font-bold text-blue-900 mb-2">
+                                            <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-blue-600" /> 12 Llamadas Diarias</span>
+                                            <span className={data.periodos?.dia?.llamadas >= 12 ? 'text-green-600' : 'text-blue-500'}>
+                                                {data.periodos?.dia?.llamadas || 0} / 12
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-blue-100/50 rounded-full h-1.5">
+                                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(((data.periodos?.dia?.llamadas || 0) / 12) * 100, 100)}%` }}></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Meta 1 prospecto diario */}
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm">
+                                        <div className="flex justify-between items-center text-xs font-bold text-blue-900 mb-2">
+                                            <span className="flex items-center gap-1.5"><UserPlus className="w-3.5 h-3.5 text-blue-600" /> 1 Prospecto Diario</span>
+                                            <span className={data.periodos?.dia?.prospectos >= 1 ? 'text-green-600' : 'text-blue-500'}>
+                                                {data.periodos?.dia?.prospectos || 0} / 1
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-blue-100/50 rounded-full h-1.5">
+                                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(((data.periodos?.dia?.prospectos || 0) / 1) * 100, 100)}%` }}></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Meta 1 reunión semanal */}
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm">
+                                        <div className="flex justify-between items-center text-xs font-bold text-blue-900 mb-2">
+                                            <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-blue-600" /> 1 Cita Semanal</span>
+                                            <span className={data.periodos?.semana?.reuniones >= 1 ? 'text-green-600' : 'text-blue-500'}>
+                                                {data.periodos?.semana?.reuniones || 0} / 1
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-blue-100/50 rounded-full h-1.5">
+                                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(((data.periodos?.semana?.reuniones || 0) / 1) * 100, 100)}%` }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {loadingTareas ? (
                                     <div className="flex justify-center items-center h-20">
-                                        <RefreshCw className="w-6 h-6 animate-spin text-teal-500" />
-                                    </div>
-                                ) : tareasPendientes.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
-                                        <CheckCircle2 className="w-10 h-10 opacity-20" />
-                                        <p className="text-sm">¡Todo listo! No hay tareas para hoy.</p>
+                                        <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
                                     </div>
                                 ) : (
                                     tareasPendientes.map((t) => (
-                                        <div key={t.id || t._id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-center justify-between group hover:border-teal-300 transition-colors shadow-sm">
+                                        <div key={t.id || t._id} className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-center justify-between group hover:border-blue-400 transition-colors shadow-sm">
                                             <div className="flex-1 min-w-0 pr-4">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`w-2 h-2 rounded-full ${t.prioridad === 'alta' ? 'bg-red-500' : 'bg-teal-500'}`}></span>
-                                                    <h3 className="font-bold text-gray-900 text-sm truncate">{t.titulo}</h3>
+                                                    <span className={`w-2 h-2 rounded-full ${t.prioridad === 'alta' ? 'bg-red-500' : 'bg-blue-500'}`}></span>
+                                                    <h3 className="font-bold text-blue-900 text-sm truncate">{t.titulo}</h3>
                                                 </div>
-                                                <p className="text-xs text-gray-500 line-clamp-1">{t.descripcion}</p>
+                                                <p className="text-xs text-blue-700/70 line-clamp-1">{t.descripcion}</p>
                                                 {t.clienteNombre && (
-                                                    <p className="text-[10px] text-teal-600 font-bold mt-1 uppercase tracking-wider">
+                                                    <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-wider">
                                                         👤 {t.clienteNombre} {t.clienteApellido}
                                                     </p>
                                                 )}
                                                 <div className="flex items-center gap-2 mt-2">
-                                                    <Clock className="w-3 h-3 text-gray-400" />
-                                                    <span className="text-[10px] text-gray-400 font-medium">
+                                                    <Clock className="w-3 h-3 text-blue-400" />
+                                                    <span className="text-[10px] text-blue-400 font-medium">
                                                         {t.fechaLimite ? new Date(t.fechaLimite).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : 'Sin fecha'}
                                                     </span>
                                                 </div>
                                             </div>
                                             <button
                                                 onClick={() => completarTarea(t.id || t._id)}
-                                                className="bg-white border-2 border-teal-500 text-teal-600 h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-teal-500 hover:text-white transition-all shrink-0"
+                                                className="bg-white border-2 border-blue-500 text-blue-600 h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-blue-500 hover:text-white transition-all shrink-0"
                                             >
                                                 <CheckCircle2 className="w-4 h-4" />
                                                 Cerrar

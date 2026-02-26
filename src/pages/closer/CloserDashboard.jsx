@@ -41,7 +41,7 @@ const CloserDashboard = () => {
     // Función para sanitizar datos y evitar NaN
     const sanitizeData = (rawData) => {
         if (!rawData) return INITIAL_DATA;
-        
+
         const getNumero = (val) => {
             const num = parseFloat(val);
             return isNaN(num) || num === null ? 0 : num;
@@ -59,13 +59,16 @@ const CloserDashboard = () => {
                 reuniones: {
                     hoy: getNumero(rawData?.metricas?.reuniones?.hoy),
                     pendientes: getNumero(rawData?.metricas?.reuniones?.pendientes),
-                    realizadas: getNumero(rawData?.metricas?.reuniones?.realizadas)
+                    realizadas: getNumero(rawData?.metricas?.reuniones?.realizadas),
+                    realizadasHoy: getNumero(rawData?.metricas?.reuniones?.realizadasHoy),
+                    propuestasHoy: getNumero(rawData?.metricas?.reuniones?.propuestasHoy)
                 },
                 ventas: {
                     mes: getNumero(rawData?.metricas?.ventas?.mes),
                     montoMes: getNumero(rawData?.metricas?.ventas?.montoMes),
                     totales: getNumero(rawData?.metricas?.ventas?.totales),
-                    montoTotal: getNumero(rawData?.metricas?.ventas?.montoTotal)
+                    montoTotal: getNumero(rawData?.metricas?.ventas?.montoTotal),
+                    ventasHoy: getNumero(rawData?.metricas?.ventas?.ventasHoy)
                 },
                 clientes: {
                     totales: getNumero(rawData?.metricas?.clientes?.totales)
@@ -122,31 +125,36 @@ const CloserDashboard = () => {
         }
     };
 
-    const cargarTareas = async () => {
+    const cargarProximasReuniones = async () => {
         setLoadingTareas(true);
         try {
-            const response = await axios.get(`${API_URL}/api/tareas`, { headers: getAuthHeaders() });
-            setTareas(response.data);
+            const response = await axios.get(`${API_URL}/api/closer/calendario`, { headers: getAuthHeaders() });
+
+            const ahora = new Date();
+
+            // 1. Filtrar solo las reuniones que NO han pasado (de ahora en adelante)
+            // 2. Filtrar que sigan pendientes (por si la API trae algo más)
+            const proximas = response.data.filter(r => {
+                const fecha = new Date(r.fecha);
+                const esPendiente = r.resultado === 'pendiente' || !r.resultado;
+                return fecha >= ahora && esPendiente;
+            });
+
+            // 3. Ordenar por fecha (más cercanas primero)
+            proximas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+            // 4. Tomar solo las top 3
+            setTareas(proximas.slice(0, 3));
         } catch (error) {
-            console.error('Error al cargar tareas:', error);
+            console.error('Error al cargar próximas reuniones:', error);
         } finally {
             setLoadingTareas(false);
         }
     };
 
-    const completarTarea = async (id) => {
-        try {
-            await axios.put(`${API_URL}/api/tareas/${id}`, { estado: 'completada' }, { headers: getAuthHeaders() });
-            setTareas(prev => prev.map(t => (t.id === id || t._id === id) ? { ...t, estado: 'completada' } : t));
-            setTimeout(cargarTareas, 1000);
-        } catch (error) {
-            console.error('Error al completar tarea:', error);
-        }
-    };
-
     useEffect(() => {
         cargarDatos();
-        cargarTareas();
+        cargarProximasReuniones();
     }, []);
 
     if (loading) {
@@ -161,8 +169,6 @@ const CloserDashboard = () => {
     }
 
     if (!data) return null;
-
-    const tareasPendientes = tareas.filter(t => t.estado === 'pendiente');
 
     return (
         <div className="h-full flex flex-col p-5 overflow-hidden">
@@ -189,9 +195,9 @@ const CloserDashboard = () => {
                                 contadorHoy: data.metricas.reuniones.hoy,
                                 labelContador: 'hoy',
                                 cantidadExito: data.embudo.reunion_realizada,
-                                cantidadPerdida: data.embudo.reunion_agendada - data.embudo.reunion_realizada,
+                                cantidadPerdida: data.analisisPerdidas.no_asistio,
                                 porcentajeExito: Math.round(data.tasasConversion.asistencia) || 0,
-                                porcentajePerdida: ((100 - (data.tasasConversion.asistencia || 0))).toFixed(1),
+                                porcentajePerdida: data.embudo.reunion_agendada > 0 ? ((data.analisisPerdidas.no_asistio / data.embudo.reunion_agendada) * 100).toFixed(1) : 0,
                                 labelExito: 'asisten',
                                 labelPerdida: 'no asisten'
                             },
@@ -199,10 +205,12 @@ const CloserDashboard = () => {
                                 etapa: 'Reuniones Realizadas',
                                 cantidad: data.embudo.reunion_realizada,
                                 color: 'bg-cyan-500',
+                                contadorHoy: data.metricas.reuniones.realizadasHoy,
+                                labelContador: 'hoy',
                                 cantidadExito: data.embudo.propuesta_enviada,
-                                cantidadPerdida: data.embudo.reunion_realizada - data.embudo.propuesta_enviada,
+                                cantidadPerdida: data.analisisPerdidas.no_interesado,
                                 porcentajeExito: Math.round(data.tasasConversion.interes) || 0,
-                                porcentajePerdida: ((100 - (data.tasasConversion.interes || 0))).toFixed(1),
+                                porcentajePerdida: data.embudo.reunion_realizada > 0 ? ((data.analisisPerdidas.no_interesado / data.embudo.reunion_realizada) * 100).toFixed(1) : 0,
                                 labelExito: 'piden propuesta',
                                 labelPerdida: 'no interesados'
                             },
@@ -210,17 +218,21 @@ const CloserDashboard = () => {
                                 etapa: 'Propuestas Enviadas',
                                 cantidad: data.embudo.propuesta_enviada,
                                 color: 'bg-orange-500',
+                                contadorHoy: data.metricas.reuniones.propuestasHoy,
+                                labelContador: 'hoy',
                                 cantidadExito: data.embudo.venta_ganada,
                                 cantidadPerdida: data.embudo.propuesta_enviada - data.embudo.venta_ganada,
                                 porcentajeExito: Math.round(data.tasasConversion.cierre) || 0,
-                                porcentajePerdida: ((100 - (data.tasasConversion.cierre || 0))).toFixed(1),
+                                porcentajePerdida: data.embudo.propuesta_enviada > 0 ? (((data.embudo.propuesta_enviada - data.embudo.venta_ganada) / data.embudo.propuesta_enviada) * 100).toFixed(1) : 0,
                                 labelExito: 'aceptada',
-                                labelPerdida: 'rechazada'
+                                labelPerdida: 'rechazada o en proceso'
                             },
                             {
                                 etapa: 'Ventas Cerradas',
                                 cantidad: data.embudo.venta_ganada,
                                 color: 'bg-green-500',
+                                contadorHoy: data.metricas.ventas.ventasHoy,
+                                labelContador: 'hoy',
                                 cantidadExito: data.embudo.venta_ganada,
                                 porcentajeExito: 100,
                                 labelExito: 'ganadas'
@@ -286,50 +298,85 @@ const CloserDashboard = () => {
                     <div className="lg:col-span-2 flex flex-col min-h-0">
                         <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col overflow-hidden">
                             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2 flex-shrink-0">
-                                <Target className="w-6 h-6 text-green-600" />
-                                Tareas Pendientes
+                                <Calendar className="w-6 h-6 text-blue-600" />
+                                Próximas Reuniones
                             </h2>
 
-                            <div className="flex-1 space-y-4 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#8bc34a #f3f4f6' }}>
+                            <div className="flex-1 space-y-4 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#3b82f6 #f3f4f6' }}>
                                 {loadingTareas ? (
                                     <div className="flex justify-center items-center h-20">
-                                        <RefreshCw className="w-6 h-6 animate-spin text-green-500" />
+                                        <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
                                     </div>
-                                ) : tareasPendientes.length === 0 ? (
+                                ) : tareas.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
-                                        <CheckCircle2 className="w-10 h-10 opacity-20" />
-                                        <p className="text-sm">No hay tareas pendientes en este momento.</p>
+                                        <Calendar className="w-10 h-10 opacity-20" />
+                                        <p className="text-sm">No tienes reuniones próximas programadas.</p>
                                     </div>
                                 ) : (
-                                    tareasPendientes.map((t) => (
-                                        <div key={t.id || t._id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-center justify-between group hover:border-green-300 transition-colors shadow-sm">
-                                            <div className="flex-1 min-w-0 pr-4">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`w-2 h-2 rounded-full ${t.prioridad === 'alta' ? 'bg-red-500' : 'bg-green-500'}`}></span>
-                                                    <h3 className="font-bold text-gray-900 text-sm truncate">{t.titulo}</h3>
+                                    tareas.map((t) => {
+                                        // Extraer links de Google Meet o Zoom de las notas
+                                        let meetLink = null;
+                                        if (t.notas) {
+                                            const meetMatch = t.notas.match(/https:\/\/(?:meet\.google\.com|us\d+web\.zoom\.us\/j)\/[^\s]+/i);
+                                            if (meetMatch) meetLink = meetMatch[0];
+                                        }
+
+                                        return (
+                                            <div key={t.id || t._id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex flex-col group hover:border-blue-300 transition-colors shadow-sm gap-2">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                            <h3 className="font-bold text-gray-900 text-sm truncate">
+                                                                {t.cliente?.nombres} {t.cliente?.apellidoPaterno}
+                                                            </h3>
+                                                        </div>
+                                                        {t.cliente?.empresa && (
+                                                            <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                                                                🏢 {t.cliente.empresa}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="bg-blue-100 text-blue-700 font-bold text-xs px-2 py-1 rounded-md shrink-0 border border-blue-200">
+                                                        {new Date(t.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs text-gray-500 line-clamp-1">{t.descripcion}</p>
-                                                {t.clienteNombre && (
-                                                    <p className="text-[10px] text-green-600 font-bold mt-1 uppercase tracking-wider">
-                                                        👤 {t.clienteNombre} {t.clienteApellido}
-                                                    </p>
+
+                                                <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                                    {t.cliente?.telefono && (
+                                                        <span className="flex items-center gap-1 truncate text-[10px]">
+                                                            📞 {t.cliente.telefono}
+                                                        </span>
+                                                    )}
+                                                    {t.cliente?.correo && (
+                                                        <span className="flex items-center gap-1 truncate text-[10px]">
+                                                            📧 {t.cliente.correo}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {t.notas && (
+                                                    <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border border-gray-100 italic">
+                                                        {t.notas}
+                                                    </div>
                                                 )}
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    <Clock className="w-3 h-3 text-gray-400" />
-                                                    <span className="text-[10px] text-gray-400 font-medium">
-                                                        {t.fechaLimite ? new Date(t.fechaLimite).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : 'Sin fecha'}
-                                                    </span>
-                                                </div>
+
+                                                {meetLink && (
+                                                    <a
+                                                        href={meetLink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center gap-2 text-xs transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                        </svg>
+                                                        Unirse a la Reunión
+                                                    </a>
+                                                )}
                                             </div>
-                                            <button
-                                                onClick={() => completarTarea(t.id || t._id)}
-                                                className="bg-white border-2 border-green-500 text-green-600 h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-green-500 hover:text-white transition-all shrink-0"
-                                            >
-                                                <CheckCircle2 className="w-4 h-4" />
-                                                Cerrar
-                                            </button>
-                                        </div>
-                                    ))
+                                        )
+                                    })
                                 )}
                             </div>
                         </div>

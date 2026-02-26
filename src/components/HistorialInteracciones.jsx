@@ -52,9 +52,17 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true }) =
             return etapaLabels[item.etapa] || item.etapa;
         }
 
+        // Para actividades tipo 'cita', mostrar label más específico según el estado
+        if (item.tipoActividad === 'cita') {
+            if (item.resultado === 'pendiente') return '📅 Cita Agendada';
+            if (item.resultado === 'exitoso') return '✅ Reunión Realizada';
+            if (item.resultado === 'fallido') return '❌ Reunión Cancelada/No asistió';
+            if (item.descripcion && item.descripcion.includes('agendada')) return '📅 Cita Agendada';
+            return '📅 Reunión';
+        }
+
         const tipoLabels = {
             llamada: 'Llamada',
-            cita: 'Reunión/Cita',
             whatsapp: 'WhatsApp',
             mensaje: 'Mensaje',
             correo: 'Correo',
@@ -97,10 +105,15 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true }) =
         ? timeline
         : timeline.filter(item => {
             if (filtroTipo === 'etapas') return item.tipo === 'cambio_etapa';
+            if (filtroTipo === 'reuniones') return item.tipoActividad === 'cita';
+            if (filtroTipo === 'llamadas') return item.tipoActividad === 'llamada';
             if (filtroTipo === 'prospector') return item.vendedorRol === 'prospector';
             if (filtroTipo === 'closer') return item.vendedorRol === 'closer';
             return item.tipoActividad === filtroTipo;
         });
+
+    // Contar reuniones reales (solo actividades tipo 'cita', no cambios de etapa)
+    const totalReuniones = timeline.filter(i => i.tipoActividad === 'cita').length;
 
     if (timeline.length === 0) {
         return (
@@ -154,6 +167,26 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true }) =
                     }`}
                 >
                     🏁 Closer
+                </button>
+                <button
+                    onClick={() => setFiltroTipo('reuniones')}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                        filtroTipo === 'reuniones'
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                    }`}
+                >
+                    📅 Reuniones ({totalReuniones})
+                </button>
+                <button
+                    onClick={() => setFiltroTipo('llamadas')}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                        filtroTipo === 'llamadas'
+                            ? 'bg-green-500 text-white'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                >
+                    📞 Llamadas
                 </button>
             </div>
 
@@ -243,7 +276,7 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true }) =
 
             {/* Resumen */}
             <div className="pt-4 border-t border-slate-200">
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-4 gap-3 text-sm">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
                         <p className="text-xs text-blue-600 font-semibold mb-1">Del Prospector</p>
                         <p className="text-xl font-bold text-blue-700">
@@ -254,6 +287,12 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true }) =
                         <p className="text-xs text-teal-600 font-semibold mb-1">Del Closer</p>
                         <p className="text-xl font-bold text-teal-700">
                             {timeline.filter(i => i.vendedorRol === 'closer').length}
+                        </p>
+                    </div>
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-center">
+                        <p className="text-xs text-indigo-600 font-semibold mb-1">Reuniones</p>
+                        <p className="text-xl font-bold text-indigo-700">
+                            {totalReuniones}
                         </p>
                     </div>
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">

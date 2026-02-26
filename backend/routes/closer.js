@@ -18,40 +18,104 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
 
         const embudo = {
             total: clientes.length,
-            reunion_agendada: clientes.filter(c => c.etapaEmbudo === 'reunion_agendada').length,
-            reunion_realizada: clientes.filter(c => c.etapaEmbudo === 'reunion_realizada').length,
-            en_negociacion: clientes.filter(c => c.etapaEmbudo === 'en_negociacion').length,
-            venta_ganada: clientes.filter(c => c.etapaEmbudo === 'venta_ganada').length,
-            perdido: clientes.filter(c => c.etapaEmbudo === 'perdido').length
+            reunion_agendada: clientes.length, // Todo cliente asignado pasa por agendada
+            reunion_realizada: 0,
+            propuesta_enviada: 0,
+            venta_ganada: 0,
+            en_negociacion: 0,
+            perdido: 0
         };
 
-        const hoyInicio = new Date().toISOString().slice(0, 10) + ' 00:00:00';
-        const hoyFin = new Date().toISOString().slice(0, 10) + ' 23:59:59';
+        const analisisPerdidas = {
+            no_asistio: 0,
+            no_interesado: 0
+        };
+
+        for (const c of clientes) {
+            if (c.etapaEmbudo === 'en_negociacion') embudo.en_negociacion++;
+            if (c.etapaEmbudo === 'perdido') embudo.perdido++;
+
+            const hist = c.historialEmbudo ? JSON.parse(c.historialEmbudo) : [];
+            const results = hist.map(h => h.resultado).filter(Boolean);
+            const rLast = results.length > 0 ? results[results.length - 1] : null;
+
+            let realized = false;
+            let propuesta = false;
+            let venta = false;
+
+            if (c.etapaEmbudo === 'venta_ganada') {
+                realized = true; propuesta = true; venta = true;
+            } else if (c.etapaEmbudo === 'en_negociacion') {
+                realized = true; propuesta = true;
+            } else if (c.etapaEmbudo === 'reunion_realizada') {
+                realized = true;
+            } else if (c.etapaEmbudo === 'perdido') {
+                if (rLast === 'no_asistio' || results.includes('no_asistio')) {
+                    analisisPerdidas.no_asistio++;
+                } else {
+                    realized = true;
+                    analisisPerdidas.no_interesado++;
+                }
+            } else {
+                if (rLast === 'venta') {
+                    realized = true; propuesta = true; venta = true;
+                } else if (rLast === 'cotizacion') {
+                    realized = true; propuesta = true;
+                } else if (rLast === 'no_venta' || rLast === 'otra_reunion') {
+                    realized = true;
+                    if (rLast === 'no_venta') analisisPerdidas.no_interesado++;
+                } else if (rLast === 'no_asistio') {
+                    analisisPerdidas.no_asistio++;
+                }
+            }
+
+            if (realized) embudo.reunion_realizada++;
+            if (propuesta) embudo.propuesta_enviada++;
+            if (venta) embudo.venta_ganada++;
+        }
+
+        const hoyInicioDate = new Date();
+        hoyInicioDate.setHours(0, 0, 0, 0);
+        const hoyInicio = hoyInicioDate.toISOString();
+
+        const hoyFinDate = new Date();
+        hoyFinDate.setHours(23, 59, 59, 999);
+        const hoyFin = hoyFinDate.toISOString();
+
         const reunionesHoy = db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND tipo = ? AND fecha >= ? AND fecha <= ?')
             .all(closerId, 'cita', hoyInicio, hoyFin);
 
-        const inicioMes = new Date();
-        inicioMes.setDate(1);
-        inicioMes.setHours(0, 0, 0, 0);
-        const ventasMes = db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ?').all(closerId, inicioMes.toISOString());
+        const actividadesHoy = db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?')
+            .all(closerId, hoyInicio, hoyFin);
+
+        const reunionesRealizadasHoy = actividadesHoy.filter(a => a.tipo === 'cita' && a.resultado !== 'pendiente').length;
+        const propuestasHoy = actividadesHoy.filter(a => a.descripcion && a.descripcion.toLowerCase().includes('cotización')).length;
+
+        const inicioMesDate = new Date();
+        inicioMesDate.setDate(1);
+        inicioMesDate.setHours(0, 0, 0, 0);
+        const inicioMes = inicioMesDate.toISOString();
+
+        const ventasMes = db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ?').all(closerId, inicioMes);
+        const ventasHoy = db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ? AND fecha <= ?').all(closerId, hoyInicio, hoyFin);
         const montoTotalMes = ventasMes.reduce((sum, v) => sum + (v.monto || 0), 0);
 
-        const totalReuniones = embudo.reunion_realizada + embudo.en_negociacion + embudo.venta_ganada + embudo.perdido;
         const tasasConversion = {
-            asistencia: embudo.total > 0 ? ((totalReuniones / embudo.total) * 100).toFixed(1) : '0.0',
-            negociacion: totalReuniones > 0 ? (((embudo.en_negociacion + embudo.venta_ganada) / totalReuniones) * 100).toFixed(1) : '0.0',
-            cierre: (embudo.en_negociacion + embudo.venta_ganada) > 0 ? ((embudo.venta_ganada / (embudo.en_negociacion + embudo.venta_ganada)) * 100).toFixed(1) : '0.0',
-            global: embudo.total > 0 ? ((embudo.venta_ganada / embudo.total) * 100).toFixed(1) : '0.0'
+            asistencia: embudo.reunion_agendada > 0 ? ((embudo.reunion_realizada / embudo.reunion_agendada) * 100).toFixed(1) : '0.0',
+            interes: embudo.reunion_realizada > 0 ? ((embudo.propuesta_enviada / embudo.reunion_realizada) * 100).toFixed(1) : '0.0',
+            cierre: embudo.propuesta_enviada > 0 ? ((embudo.venta_ganada / embudo.propuesta_enviada) * 100).toFixed(1) : '0.0',
+            global: embudo.reunion_agendada > 0 ? ((embudo.venta_ganada / embudo.reunion_agendada) * 100).toFixed(1) : '0.0'
         };
 
         res.json({
             embudo,
             metricas: {
-                reuniones: { hoy: reunionesHoy.length, pendientes: embudo.reunion_agendada, realizadas: totalReuniones },
-                ventas: { mes: ventasMes.length, montoMes: montoTotalMes, totales: embudo.venta_ganada },
+                reuniones: { hoy: reunionesHoy.length, pendientes: clientes.filter(c => c.etapaEmbudo === 'reunion_agendada').length, realizadas: embudo.reunion_realizada, realizadasHoy: reunionesRealizadasHoy, propuestasHoy: propuestasHoy },
+                ventas: { mes: ventasMes.length, montoMes: montoTotalMes, totales: embudo.venta_ganada, ventasHoy: ventasHoy.length },
                 negociaciones: { activas: embudo.en_negociacion }
             },
-            tasasConversion
+            tasasConversion,
+            analisisPerdidas
         });
     } catch (error) {
         console.error(error);
@@ -62,21 +126,117 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
 router.get('/calendario', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
+        
+        // Obtener todas las citas pendientes de la BD
         const rows = db.prepare(`
             SELECT a.*, c.nombres as c_nombres, c.apellidoPaterno as c_apellido, c.empresa as c_empresa, c.telefono as c_telefono, c.correo as c_correo, c.etapaEmbudo as c_etapa,
             u.nombre as v_nombre FROM actividades a
             JOIN clientes c ON a.cliente = c.id
             JOIN usuarios u ON a.vendedor = u.id
-            WHERE a.vendedor = ? AND a.tipo = ?
+            WHERE c.closerAsignado = ? AND a.tipo = ? AND a.resultado = 'pendiente'
             ORDER BY a.fecha ASC
         `).all(closerId, 'cita');
-        const reuniones = rows.map(r => ({
+
+        // Filtrar citas que ya pasaron automáticamente
+        const ahora = new Date();
+        let reuniones = rows.filter(r => {
+            const fechaCita = new Date(r.fecha);
+            return fechaCita >= ahora;
+        }).map(r => ({
             ...toMongoFormat(r),
             cliente: { nombres: r.c_nombres, apellidoPaterno: r.c_apellido, empresa: r.c_empresa, telefono: r.c_telefono, correo: r.c_correo, etapaEmbudo: r.c_etapa },
             vendedor: { nombre: r.v_nombre }
         }));
+
+        // Marcar como fallidas las citas que ya pasaron
+        const citasPasadas = rows.filter(r => new Date(r.fecha) < ahora);
+        for (const cita of citasPasadas) {
+            db.prepare(`UPDATE actividades SET resultado = 'fallido', notas = COALESCE(notas || ' ', '') || '[Auto] Cita pasada sin registrar' WHERE id = ?`)
+                .run(cita.id);
+        }
+
+        // Intentar sincronizar con Google Calendar si está conectado
+        try {
+            const usuario = db.prepare('SELECT googleRefreshToken, googleAccessToken, googleTokenExpiry FROM usuarios WHERE id = ?').get(closerId);
+            
+            if (usuario && (usuario.googleRefreshToken || usuario.googleAccessToken)) {
+                const { OAuth2Client } = require('google-auth-library');
+                const { google } = require('googleapis');
+
+                const client = new OAuth2Client(
+                    process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
+                    process.env.GOOGLE_CLIENT_SECRET
+                );
+
+                client.setCredentials({
+                    refresh_token: usuario.googleRefreshToken,
+                    access_token: usuario.googleAccessToken,
+                    expiry_date: usuario.googleTokenExpiry
+                });
+
+                // Actualizar tokens si se refrescan
+                client.on('tokens', (tokens) => {
+                    let updateStr = [];
+                    let params = [];
+                    if (tokens.refresh_token) { updateStr.push('googleRefreshToken = ?'); params.push(tokens.refresh_token); }
+                    if (tokens.access_token) { updateStr.push('googleAccessToken = ?'); params.push(tokens.access_token); }
+                    if (tokens.expiry_date) { updateStr.push('googleTokenExpiry = ?'); params.push(tokens.expiry_date); }
+
+                    if (updateStr.length > 0) {
+                        params.push(closerId);
+                        db.prepare(`UPDATE usuarios SET ${updateStr.join(', ')} WHERE id = ?`).run(...params);
+                    }
+                });
+
+                const calendar = google.calendar({ version: 'v3', auth: client });
+
+                // Obtener eventos de Google Calendar desde ahora hasta 30 días adelante
+                const timeMax = new Date();
+                timeMax.setDate(timeMax.getDate() + 30);
+
+                const response = await calendar.events.list({
+                    calendarId: 'primary',
+                    timeMin: ahora.toISOString(),
+                    timeMax: timeMax.toISOString(),
+                    singleEvents: true,
+                    orderBy: 'startTime'
+                });
+
+                const eventosGoogle = response.data.items || [];
+                
+                // Verificar cada cita pendiente si todavía existe en Google Calendar
+                const reunionesActualizadas = [];
+                for (const reunion of reuniones) {
+                    const fechaReunion = new Date(reunion.fecha);
+                    
+                    // Buscar si existe un evento en Google Calendar cercano a esta fecha (+/- 5 minutos)
+                    const existeEnGoogle = eventosGoogle.some(evento => {
+                        if (!evento.start || !evento.start.dateTime) return false;
+                        const fechaEvento = new Date(evento.start.dateTime);
+                        const diferencia = Math.abs(fechaEvento - fechaReunion);
+                        return diferencia < 5 * 60 * 1000; // 5 minutos de tolerancia
+                    });
+
+                    if (existeEnGoogle) {
+                        // La cita todavía existe en Google Calendar
+                        reunionesActualizadas.push(reunion);
+                    } else {
+                        // La cita fue eliminada de Google Calendar, marcarla como cancelada
+                        db.prepare(`UPDATE actividades SET resultado = 'fallido', notas = COALESCE(notas || ' ', '') || '[Sync] Eliminada de Google Calendar' WHERE id = ?`)
+                            .run(reunion.id || reunion._id);
+                    }
+                }
+
+                reuniones = reunionesActualizadas;
+            }
+        } catch (syncError) {
+            // Si falla la sincronización con Google, continuar con los datos locales
+            console.error('Error al sincronizar con Google Calendar:', syncError.message);
+        }
+
         res.json(reuniones);
     } catch (error) {
+        console.error('Error en calendario:', error);
         res.status(500).json({ msg: 'Error del servidor' });
     }
 });
@@ -199,12 +359,12 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
             return res.status(404).json({ msg: 'Cliente no encontrado' });
         }
         const closerId = parseInt(req.usuario.id);
-        
+
         // MEJORADO: Validar que el closer esté asignado O que sea un prospector registrando
         // (permitir que prospector registre actividades de sus propios clientes)
         const esCloserAsignado = cliente.closerAsignado === closerId;
         const esProspectorDelCliente = cliente.prospectorAsignado === closerId && String(req.usuario.rol).toLowerCase() === 'prospector';
-        
+
         if (!esCloserAsignado && !esProspectorDelCliente) {
             return res.status(403).json({ msg: 'No tienes permiso para registrar actividades de este cliente' });
         }
@@ -237,19 +397,19 @@ router.get('/prospecto/:id/historial-completo', [auth, esCloser], async (req, re
     try {
         const prospectoId = parseInt(req.params.id);
         const usuarioId = parseInt(req.usuario.id);
-        
+
         // Obtener cliente
         const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
         if (!cliente) {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
-        
+
         // Validar permisos: solo el closer o prospector asignado pueden ver
         const esCloserAsignado = cliente.closerAsignado === usuarioId;
         if (!esCloserAsignado) {
             return res.status(403).json({ msg: 'No tienes permiso para ver este historial' });
         }
-        
+
         // Obtener TODAS las actividades del cliente (de prospector Y closer)
         const actividades = db.prepare(`
             SELECT a.*, u.nombre as vendedorNombre, u.rol as vendedorRol
@@ -258,25 +418,35 @@ router.get('/prospecto/:id/historial-completo', [auth, esCloser], async (req, re
             WHERE a.cliente = ?
             ORDER BY a.fecha ASC
         `).all(prospectoId);
-        
+
         // Obtener historial del embudo
         const historialEmbudo = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
-        
+
         // Construir timeline completo
         const timeline = [];
+
+        // Agregar cambios de etapa (FILTRAR los redundantes con actividades de cita)
+        // Las etapas de reunion_agendada y reunion_realizada ya se muestran como actividades tipo 'cita'
+        const etapasRelacionadasConCitas = ['reunion_agendada', 'reunion_realizada'];
         
-        // Agregar cambios de etapa
         historialEmbudo.forEach(h => {
-            timeline.push({
-                tipo: 'cambio_etapa',
-                etapa: h.etapa,
-                fecha: h.fecha,
-                vendedorId: h.vendedor,
-                descripcion: h.descripcion || `Cambio a etapa: ${h.etapa}`,
-                resultado: h.resultado || null
-            });
+            // Solo agregar cambios de etapa que NO sean redundantes con actividades de cita
+            const esRedundante = etapasRelacionadasConCitas.includes(h.etapa) && 
+                                 actividades.some(a => a.tipo === 'cita' && 
+                                                      Math.abs(new Date(a.fecha) - new Date(h.fecha)) < 60000); // 1 minuto tolerancia
+            
+            if (!esRedundante) {
+                timeline.push({
+                    tipo: 'cambio_etapa',
+                    etapa: h.etapa,
+                    fecha: h.fecha,
+                    vendedorId: h.vendedor,
+                    descripcion: h.descripcion || `Cambio a etapa: ${h.etapa}`,
+                    resultado: h.resultado || null
+                });
+            }
         });
-        
+
         // Agregar actividades
         actividades.forEach(a => {
             const mongoAct = toMongoFormat(a);
@@ -293,10 +463,10 @@ router.get('/prospecto/:id/historial-completo', [auth, esCloser], async (req, re
                 notas: a.notas
             });
         });
-        
+
         // Ordenar por fecha
         timeline.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-        
+
         res.json({
             cliente: toMongoFormat(cliente) || cliente,
             timeline,
@@ -384,10 +554,14 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
         db.prepare('UPDATE clientes SET etapaEmbudo = ?, estado = ?, fechaUltimaEtapa = ?, ultimaInteraccion = ?, historialEmbudo = ? WHERE id = ?')
             .run(etapaNueva, estado, now, now, JSON.stringify(hist), cid);
 
+        const resStatus = resultado === 'venta' ? 'exitoso' : (resultado === 'no_asistio' || resultado === 'no_venta' ? 'fallido' : 'exitoso');
+
+        // Cerrar citas pendientes previas para que no salgan en el dashboard
+        db.prepare(`UPDATE actividades SET resultado = ? WHERE cliente = ? AND tipo = 'cita' AND resultado = 'pendiente'`)
+            .run(resStatus, cid);
+
         db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?, ?)')
-            .run('cita', closerId, cid, now, descripcion,
-                resultado === 'venta' ? 'convertido' : resultado === 'no_asistio' || resultado === 'no_venta' ? 'fallido' : 'exitoso',
-                notas || '');
+            .run('cita', closerId, cid, now, descripcion, resStatus, notas || '');
 
         const row = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
         res.json({ msg: 'Reunión registrada', cliente: toMongoFormat(row) || row });
@@ -462,8 +636,8 @@ router.post('/pasar-a-cliente/:id', [auth, esCloser], async (req, res) => {
         const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
         hist.push({ etapa: 'venta_ganada', fecha: now, vendedor: closerId });
 
-        db.prepare('UPDATE clientes SET etapaEmbudo = ?, fechaUltimaEtapa = ?, ultimaInteraccion = ?, historialEmbudo = ? WHERE id = ?')
-            .run('venta_ganada', now, now, JSON.stringify(hist), clienteId);
+        db.prepare('UPDATE clientes SET etapaEmbudo = ?, estado = ?, fechaUltimaEtapa = ?, ultimaInteraccion = ?, historialEmbudo = ? WHERE id = ?')
+            .run('venta_ganada', 'ganado', now, now, JSON.stringify(hist), clienteId);
 
         res.json({ msg: '✓ Prospecto convertido a cliente' });
     } catch (error) {
@@ -515,7 +689,7 @@ router.post('/descartar-prospecto/:id', [auth, esCloser], async (req, res) => {
 router.post('/marcar-evento-completado', [auth, esCloser], async (req, res) => {
     try {
         const { googleEventId, clienteId, resultado, notas } = req.body;
-        
+
         if (!googleEventId) {
             return res.status(400).json({ msg: 'googleEventId es requerido' });
         }
@@ -557,13 +731,13 @@ router.post('/marcar-evento-completado', [auth, esCloser], async (req, res) => {
 router.get('/google-events-completados', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
-        
+
         // Tabla podría no existir aún
         try {
             const completados = db.prepare(`
-                SELECT googleEventId FROM google_events_completed WHERE closerId = ?
+                SELECT googleEventId, resultado FROM google_events_completed WHERE closerId = ?
             `).all(closerId);
-            res.json(completados.map(c => c.googleEventId));
+            res.json(completados);
         } catch (err) {
             // Tabla no existe aún
             res.json([]);

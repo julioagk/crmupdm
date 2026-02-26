@@ -236,7 +236,7 @@ router.post('/create-event', auth, async (req, res) => {
             const now = new Date().toISOString();
             try {
                 db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?, ?)')
-                    .run('cita', userId, cid, new Date(startDateTime).toISOString(), `Próxima reunión agendada: ${title}`, 'exitoso', description || '');
+                    .run('cita', userId, cid, new Date(startDateTime).toISOString(), `Próxima reunión agendada: ${title}`, 'pendiente', description || '');
                 db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, cid);
             } catch (dbErr) {
                 console.error('Error registrando actividad:', dbErr);
@@ -269,7 +269,7 @@ router.patch('/mark-completed/:eventId', auth, async (req, res) => {
 
         const userId = parseInt(req.usuario.id);
         const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(userId);
-        
+
         if (!usuario || !usuario.googleAccessToken) {
             console.warn(`⚠️ Usuario ${userId} no tiene googleAccessToken`);
             return res.status(400).json({ msg: 'No hay token de Google Calendar disponible' });
@@ -284,7 +284,7 @@ router.patch('/mark-completed/:eventId', auth, async (req, res) => {
 
         // Obtener el evento actual
         const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
-        
+
         let event;
         try {
             const getRes = await calendar.events.get({
@@ -310,13 +310,13 @@ router.patch('/mark-completed/:eventId', auth, async (req, res) => {
 
         // Construir descripción actualizada
         let nuevaDescripcion = event.data.description || '';
-        
+
         // Si ya tiene un resultado previo, removerlo
         nuevaDescripcion = nuevaDescripcion.replace(/RESULTADO:.*$/m, '').trim();
-        
+
         // Agregar nuevo resultado
         nuevaDescripcion = `${nuevaDescripcion}\n\n${descripcionResultado}`;
-        
+
         // Agregar notas si existen
         if (notas) {
             nuevaDescripcion += `\nNotas: ${notas}`;
@@ -324,7 +324,7 @@ router.patch('/mark-completed/:eventId', auth, async (req, res) => {
 
         // Construir título actualizado
         let nuevoTitulo = event.data.summary || '';
-        
+
         // Si no tiene checkmark, agregarlo
         if (!nuevoTitulo.includes('✅')) {
             nuevoTitulo = `✅ ${nuevoTitulo}`;
@@ -356,9 +356,9 @@ router.patch('/mark-completed/:eventId', auth, async (req, res) => {
         console.error('❌ Error al actualizar evento en Google Calendar:', error.message);
         console.error('Stack:', error.stack);
         // No fallar si hay error con Google Calendar, ya se registró en BD
-        res.status(500).json({ 
-            msg: 'Advertencia: No se pudo sincronizar con Google Calendar, pero se guardó en la BD', 
-            error: error.message 
+        res.status(500).json({
+            msg: 'Advertencia: No se pudo sincronizar con Google Calendar, pero se guardó en la BD',
+            error: error.message
         });
     }
 });

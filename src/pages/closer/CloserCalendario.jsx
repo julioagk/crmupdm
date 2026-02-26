@@ -103,23 +103,23 @@ const CloserCalendario = () => {
         let reunionFinal = { ...reunion };
         setPasoModal('asistencia');
         setNotasModal('');
-        
+
         // Si no tiene clienteId (viene de Google Calendar), intentar obtenerlo
         if (!reunion.clienteId && reunion.cliente && reunion.cliente.nombres) {
             try {
                 const token = getToken();
                 const nombreCliente = `${reunion.cliente.nombres || ''} ${reunion.cliente.apellidoPaterno || ''}`.toLowerCase().trim();
                 const telefonoCliente = (reunion.cliente.telefono || '').replace(/\D/g, '');
-                
+
                 // Buscar cliente por nombre o teléfono en prospectos del closer
                 const res = await fetch(`${API_URL}/api/closer/prospectos`, {
                     headers: { 'x-auth-token': token }
                 });
-                
+
                 if (res.ok) {
                     const clientes = await res.json();
                     let clientesEncontrados = [];
-                    
+
                     // Buscar por teléfono primero (más único)
                     if (telefonoCliente) {
                         clientesEncontrados = clientes.filter(c => {
@@ -127,7 +127,7 @@ const CloserCalendario = () => {
                             return cTelefono === telefonoCliente;
                         });
                     }
-                    
+
                     // Si no encuentra por teléfono, buscar por nombre exacto
                     if (clientesEncontrados.length === 0) {
                         clientesEncontrados = clientes.filter(c => {
@@ -135,7 +135,7 @@ const CloserCalendario = () => {
                             return cNombre === nombreCliente;
                         });
                     }
-                    
+
                     // Si no encuentra por nombre exacto, buscar similar
                     if (clientesEncontrados.length === 0) {
                         clientesEncontrados = clientes.filter(c => {
@@ -143,7 +143,7 @@ const CloserCalendario = () => {
                             return cNombre.includes(nombreCliente) || nombreCliente.includes(cNombre);
                         });
                     }
-                    
+
                     if (clientesEncontrados.length > 0) {
                         // Si hay múltiples, tomar el más reciente por ultimaInteraccion
                         const clienteEncontrado = clientesEncontrados.sort((a, b) => {
@@ -151,7 +151,7 @@ const CloserCalendario = () => {
                             const dateB = new Date(b.ultimaInteraccion || b.fechaCreacion || 0);
                             return dateB - dateA; // Más reciente primero
                         })[0];
-                        
+
                         reunionFinal.clienteId = clienteEncontrado.id || clienteEncontrado._id;
                         console.log(`✅ Cliente encontrado y vinculado:`, clienteEncontrado.nombres, `(${clientesEncontrados.length} coincidencias)`, `ID:`, reunionFinal.clienteId);
                     } else {
@@ -163,9 +163,9 @@ const CloserCalendario = () => {
                 // Continuar aunque falle la búsqueda
             }
         }
-        
+
         setModalRegistrar(reunionFinal);
-        
+
         // Pre-llenar fecha de mañana por defecto
         const manana = new Date();
         manana.setDate(manana.getDate() + 7);
@@ -249,16 +249,16 @@ const CloserCalendario = () => {
                     });
                     if (!res.ok) { const d = await res.json(); throw new Error(d.msg); }
                 }
-                
+
                 // Guardar en BD que fue completado
                 try {
                     await fetch(`${API_URL}/api/closer/marcar-evento-completado`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             googleEventId: modalRegistrar.id,
                             clienteId: clienteId,
-                            resultado, 
+                            resultado,
                             notas: notasModal
                         })
                     });
@@ -266,24 +266,24 @@ const CloserCalendario = () => {
                 } catch (bdErr) {
                     console.warn('⚠️ No se guardó en BD:', bdErr);
                 }
-                
+
                 // Sincronizar con Google Calendar
                 try {
                     await fetch(`${API_URL}/api/google/mark-completed/${modalRegistrar.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
-                        body: JSON.stringify({ 
-                            resultado, 
+                        body: JSON.stringify({
+                            resultado,
                             notas: notasModal,
-                            clienteNombre: `${modalRegistrar.cliente.nombres} ${modalRegistrar.cliente.apellidoPaterno}` 
+                            clienteNombre: `${modalRegistrar.cliente.nombres} ${modalRegistrar.cliente.apellidoPaterno}`
                         })
                     });
                     console.log('✅ Evento marcado como completado en Google Calendar');
                 } catch (gErr) {
                     console.warn('⚠️ No se sincronizó con Google Calendar:', gErr);
                 }
-                
-                setReuniones(prev => prev.map(r => r.id === modalRegistrar.id ? { ...r, estado: 'realizada' } : r));
+
+                setReuniones(prev => prev.map(r => r.id === modalRegistrar.id ? { ...r, estado: 'realizada', resultadoExacto: resultado } : r));
                 // Pasar al paso de agendar nueva reunión
                 setPasoModal('agendar');
                 setNotasModal('');
@@ -324,16 +324,16 @@ const CloserCalendario = () => {
                     })
                 });
             }
-            
+
             // Guardar en BD que fue completado
             try {
                 await fetch(`${API_URL}/api/closer/marcar-evento-completado`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         googleEventId: modalRegistrar.id,
                         clienteId: clienteId,
-                        resultado, 
+                        resultado,
                         notas: notasModal
                     })
                 });
@@ -341,24 +341,24 @@ const CloserCalendario = () => {
             } catch (bdErr) {
                 console.warn('⚠️ No se guardó en BD:', bdErr);
             }
-            
+
             // Sincronizar con Google Calendar
             try {
                 await fetch(`${API_URL}/api/google/mark-completed/${modalRegistrar.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
-                    body: JSON.stringify({ 
-                        resultado, 
+                    body: JSON.stringify({
+                        resultado,
                         notas: notasModal,
-                        clienteNombre: `${modalRegistrar.cliente.nombres} ${modalRegistrar.cliente.apellidoPaterno}` 
+                        clienteNombre: `${modalRegistrar.cliente.nombres} ${modalRegistrar.cliente.apellidoPaterno}`
                     })
                 });
                 console.log('✅ Evento marcado como completado en Google Calendar');
             } catch (gErr) {
                 console.warn('⚠️ No se sincronizó con Google Calendar:', gErr);
             }
-            
-            setReuniones(prev => prev.map(r => r.id === modalRegistrar.id ? { ...r, estado: 'realizada' } : r));
+
+            setReuniones(prev => prev.map(r => r.id === modalRegistrar.id ? { ...r, estado: 'realizada', resultadoExacto: resultado } : r));
             const mensajes = {
                 no_asistio: '❌ Registrado: Cliente no asistió',
                 no_venta: '😐 Registrado: No le interesó',
@@ -468,7 +468,9 @@ const CloserCalendario = () => {
                     const telefono = telefonoMatch ? telefonoMatch[1].trim() : '';
 
                     // Verificar si fue completado
-                    const estadoEvento = eventosCompletados.includes(event.id) ? 'realizada' : 'pendiente';
+                    const completadoGuardado = eventosCompletados.find(e => e.googleEventId === event.id || e === event.id);
+                    const estadoEvento = completadoGuardado ? 'realizada' : 'pendiente';
+                    const resultadoExacto = typeof completadoGuardado === 'object' ? completadoGuardado.resultado : null;
 
                     return {
                         id: event.id,
@@ -483,7 +485,8 @@ const CloserCalendario = () => {
                         prospector: agendadoPor,
                         notas: notas,
                         meetLink: event.hangoutLink,
-                        estado: estadoEvento
+                        estado: estadoEvento,
+                        resultadoExacto
                     };
                 });
                 setReuniones(mappedEvents);
@@ -706,22 +709,30 @@ const CloserCalendario = () => {
                                         .map((reunion) => (
                                             <div
                                                 key={reunion.id}
-                                                className={`border rounded-lg p-4 transition-all hover:shadow-md animate-in fade-in relative ${reunion.estado === 'pendiente'
+                                                className={`border rounded-lg p-4 transition-all hover:shadow-md animate-in fade-in relative mt-2 ${reunion.estado === 'pendiente'
                                                     ? 'border-blue-200 bg-blue-50/50 hover:border-blue-300'
-                                                    : 'border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:border-green-400'
+                                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                                                     }`}
                                             >
-                                                {/* Checkmark Grande para Completadas */}
-                                                {reunion.estado === 'realizada' && (
-                                                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-2 shadow-lg">
-                                                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                                            <path d="M20 6L9 17l-5-5" />
-                                                        </svg>
+                                                {/* Etiqueta de Resultado para Completadas */}
+                                                {reunion.estado === 'realizada' && reunion.resultadoExacto && (
+                                                    <div className={`absolute -top-3 right-4 px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${reunion.resultadoExacto === 'venta' ? 'bg-[#8bc34a] text-white border-lime-600' :
+                                                            reunion.resultadoExacto === 'cotizacion' ? 'bg-blue-500 text-white border-blue-600' :
+                                                                reunion.resultadoExacto === 'otra_reunion' ? 'bg-yellow-500 text-white border-yellow-600' :
+                                                                    reunion.resultadoExacto === 'no_asistio' ? 'bg-red-500 text-white border-red-600' :
+                                                                        'bg-gray-500 text-white border-gray-600'
+                                                        }`}>
+                                                        {reunion.resultadoExacto === 'venta' ? '🎉 Venta Cerrada' :
+                                                            reunion.resultadoExacto === 'cotizacion' ? '💰 Quiere cotización' :
+                                                                reunion.resultadoExacto === 'otra_reunion' ? '📅 Quiere otra reunión' :
+                                                                    reunion.resultadoExacto === 'no_asistio' ? '❌ No asistió' :
+                                                                        reunion.resultadoExacto === 'no_venta' ? '😐 No le interesó' :
+                                                                            '✅ Completada'}
                                                     </div>
                                                 )}
 
                                                 {/* Time and Status */}
-                                                <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center justify-between mb-3 mt-1">
                                                     <div className="flex items-center gap-2">
                                                         <Clock className="w-4 h-4 text-gray-600" />
                                                         <span className="font-semibold text-gray-900">
@@ -811,7 +822,7 @@ const CloserCalendario = () => {
                                                             Registrar
                                                         </button>
                                                     )}
-                                                    
+
                                                     {reunion.estado === 'realizada' && (
                                                         <div className="flex-1 px-3 py-2 bg-green-100 text-green-700 text-xs rounded-lg flex items-center justify-center gap-1 border border-green-300 shadow-sm font-bold">
                                                             <CheckCircle2 className="w-4 h-4" />
