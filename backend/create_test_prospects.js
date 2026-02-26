@@ -1,5 +1,5 @@
 // No dependencies needed beyond db
-const db = require('./config/database');
+const { db } = require('./config/database');
 
 const firstNames = ["Juan", "María", "Carlos", "Ana", "Luis", "Elena", "Pedro", "Laura", "Jorge", "Carmen", "Javier", "Sofía", "Diego", "Lucía", "Miguel", "Paula", "Andrés", "Valeria", "Fernando", "Isabella"];
 const lastNames = ["García", "Rodríguez", "López", "Martínez", "González", "Pérez", "Sánchez", "Gómez", "Fernández", "Díaz", "Romero", "Suárez", "Torres", "Ruiz", "Hernández"];
