@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, Calendar, UserPlus, Phone, Mail, RefreshCw, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Filter, Calendar, UserPlus, Phone, Mail, RefreshCw, ChevronRight, Download, Upload, X } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { getToken } from '../../utils/authUtils';
@@ -18,6 +18,9 @@ const ProspectorProspectos = () => {
     const [closerSeleccionado, setCloserSeleccionado] = useState('');
     const [closers, setClosers] = useState([]);
     const [loadingAccion, setLoadingAccion] = useState(false);
+    const [importando, setImportando] = useState(false);
+    const [previewImport, setPreviewImport] = useState(null); // { rows, errores }
+    const fileInputRef = useRef(null);
 
     const getAuthHeaders = () => ({
         'x-auth-token': getToken() || ''
@@ -79,6 +82,93 @@ const ProspectorProspectos = () => {
         }
     };
 
+    // ============ CSV EXPORT ============
+    const exportarCSV = () => {
+        const headers = ['Nombres', 'Apellido Paterno', 'Apellido Materno', 'Teléfono', 'Correo', 'Empresa', 'Etapa', 'Recordatorio', 'Notas'];
+        const rows = prospectos.map(p => [
+            p.nombres || '',
+            p.apellidoPaterno || '',
+            p.apellidoMaterno || '',
+            p.telefono || '',
+            p.correo || '',
+            p.empresa || '',
+            getEtapaLabel(p.etapaEmbudo),
+            p.proximaLlamada ? new Date(p.proximaLlamada).toLocaleString('es-MX') : '',
+            (p.notas || '').replace(/,/g, ';').replace(/\n/g, ' ')
+        ]);
+        const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `prospectos_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`${prospectos.length} prospectos exportados`);
+    };
+
+    // ============ CSV IMPORT ============
+    const parsearCSV = (text) => {
+        const lines = text.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        const mapeo = {
+            'nombres': 'nombres', 'nombre': 'nombres',
+            'apellido paterno': 'apellidoPaterno', 'apellidopaterno': 'apellidoPaterno',
+            'apellido materno': 'apellidoMaterno', 'apellidomaterno': 'apellidoMaterno',
+            'teléfono': 'telefono', 'telefono': 'telefono', 'tel': 'telefono',
+            'correo': 'correo', 'email': 'correo',
+            'empresa': 'empresa', 'company': 'empresa',
+            'notas': 'notas', 'notes': 'notas'
+        };
+        return lines.slice(1).filter(l => l.trim()).map((line, idx) => {
+            const vals = line.split(',').map(v => v.replace(/"/g, '').trim());
+            const row = {};
+            headers.forEach((h, i) => { if (mapeo[h]) row[mapeo[h]] = vals[i] || ''; });
+            row._row = idx + 2;
+            row._error = !row.nombres || !row.telefono ? 'Falta nombre o teléfono' : null;
+            return row;
+        });
+    };
+
+    const handleArchivoCSV = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const rows = parsearCSV(ev.target.result);
+            setPreviewImport({ rows, errores: rows.filter(r => r._error).length });
+        };
+        reader.readAsText(file, 'utf-8');
+        e.target.value = '';
+    };
+
+    const confirmarImport = async () => {
+        if (!previewImport) return;
+        const validas = previewImport.rows.filter(r => !r._error);
+        if (validas.length === 0) { toast.error('No hay filas válidas para importar'); return; }
+        setImportando(true);
+        let ok = 0; let fail = 0;
+        for (const p of validas) {
+            try {
+                await axios.post(`${API_URL}/api/prospector/crear-prospecto`, {
+                    nombres: p.nombres,
+                    apellidoPaterno: p.apellidoPaterno || '',
+                    apellidoMaterno: p.apellidoMaterno || '',
+                    telefono: p.telefono,
+                    correo: p.correo || '',
+                    empresa: p.empresa || '',
+                    notas: p.notas || ''
+                }, { headers: getAuthHeaders() });
+                ok++;
+            } catch { fail++; }
+        }
+        setImportando(false);
+        setPreviewImport(null);
+        toast.success(`${ok} prospectos importados${fail > 0 ? `, ${fail} fallaron` : ''}`);
+        cargarDatos();
+    };
+
+
     const handleAgendarReunion = async () => {
         if (!modalAgendar || !fechaReunion || !closerSeleccionado) return;
         setLoadingAccion(true);
@@ -123,6 +213,21 @@ const ProspectorProspectos = () => {
                         <p className="text-gray-400 mt-1">{prospectos.length} prospectos asignados</p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={exportarCSV}
+                            className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 font-semibold text-sm border border-gray-600"
+                        >
+                            <Download className="w-4 h-4" />
+                            Exportar CSV
+                        </button>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 font-semibold text-sm border border-gray-600"
+                        >
+                            <Upload className="w-4 h-4" />
+                            Importar CSV
+                        </button>
+                        <input ref={fileInputRef} type="file" accept=".csv" onChange={handleArchivoCSV} className="hidden" />
                         <button
                             onClick={() => navigate('/prospector/seguimiento')}
                             className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors flex items-center gap-2 font-semibold"
