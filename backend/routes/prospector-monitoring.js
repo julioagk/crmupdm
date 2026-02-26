@@ -68,7 +68,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
         const fechaInicioStr = fechaInicio.toISOString();
         const ahoraStr = ahora.toISOString();
 
-        const prospectors = await db.prepare('SELECT id, nombre, email as correo FROM usuarios WHERE rol = ?').all('prospector');
+        const prospectors = await db.prepare('SELECT id, nombre, email as correo FROM usuarios WHERE rol = ? AND activo = 1').all('prospector');
         const prospectorsConMetricas = await Promise.all(prospectors.map(async (prospector) => {
             const prospectorId = prospector.id;
             const row1 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ?').get(prospectorId);
