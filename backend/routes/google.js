@@ -11,6 +11,14 @@ const oAuth2Client = new OAuth2Client(
     'postmessage'
 );
 
+// Validación de variables de entorno
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+    console.error('❌ CRITICAL: GOOGLE_CLIENT_SECRET is not defined in environment variables!');
+}
+if (!process.env.VITE_GOOGLE_CLIENT_ID && !process.env.GOOGLE_CLIENT_ID) {
+    console.error('❌ CRITICAL: Google Client ID is not defined in environment variables!');
+}
+
 // @route   POST api/google/save-tokens
 // @desc    Intercambia código por tokens y los guarda para el usuario autenticado
 // @access  Private
