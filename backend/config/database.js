@@ -35,6 +35,10 @@ const convertSql = (sql) => {
 
 // Shim para imitar better-sqlite3 de forma asíncrona
 const db = {
+  pragma: (sql) => {
+    if (isPostgres) return; // No-op en Postgres
+    return internalDb.pragma(sql);
+  },
   prepare: (sql) => {
     const finalSql = convertSql(sql);
     return {
@@ -56,9 +60,19 @@ const db = {
       },
       run: async (...params) => {
         if (isPostgres) {
-          const res = await internalDb.query(finalSql, params);
-          // Mapear insertId (Postgres) a lastInsertRowid (SQLite) si es posible
-          return { lastInsertRowid: res.rows[0]?.id || null, changes: res.rowCount };
+          let query = finalSql;
+          // Si es un INSERT y no tiene RETURNING, lo agregamos para obtener el ID
+          const trimmed = query.trim().toUpperCase();
+          if (trimmed.startsWith('INSERT') && !trimmed.includes('RETURNING')) {
+            query += ' RETURNING id';
+            const res = await internalDb.query(query, params);
+            return {
+              lastInsertRowid: res.rows[0]?.id || null,
+              changes: res.rowCount
+            };
+          }
+          const res = await internalDb.query(query, params);
+          return { lastInsertRowid: null, changes: res.rowCount };
         } else {
           return internalDb.prepare(sql).run(...params);
         }

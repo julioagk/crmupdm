@@ -86,19 +86,8 @@ router.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(contraseña, salt);
 
-        // Para Postgres necesitamos RETURNING id para obtener el ID generado
-        // El shim manejará el reemplazo de ? por $1 etc.
-        const isPostgres = process.env.DATABASE_URL ? true : false;
-        let result;
-        if (isPostgres) {
-            const query = 'INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?) RETURNING id';
-            const stmt = await db.prepare(query);
-            const resVal = await stmt.get(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
-            result = { lastInsertRowid: resVal.id };
-        } else {
-            const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
-            result = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
-        }
+        const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
+        const result = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
 
         const newUser = await db.prepare('SELECT id, usuario, nombre, rol, email FROM usuarios WHERE id = ?').get(result.lastInsertRowid);
 

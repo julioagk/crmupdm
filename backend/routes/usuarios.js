@@ -48,20 +48,10 @@ router.post('/', auth, esSuperUser, async (req, res) => {
 
         const hash = await bcrypt.hash(contraseña, 10);
 
-        const isPostgres = process.env.DATABASE_URL ? true : false;
-        let lastId;
+        const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
+        const info = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
 
-        if (isPostgres) {
-            const query = 'INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?) RETURNING id';
-            const resVal = await db.prepare(query).get(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
-            lastId = resVal.id;
-        } else {
-            const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
-            const info = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
-            lastId = info.lastInsertRowid;
-        }
-
-        const row = await db.prepare('SELECT * FROM usuarios WHERE id = ?').get(lastId);
+        const row = await db.prepare('SELECT * FROM usuarios WHERE id = ?').get(info.lastInsertRowid);
         res.status(201).json({ mensaje: 'Usuario creado', usuario: formatUser(row) });
     } catch (error) {
         console.error("Error creating user:", error);
