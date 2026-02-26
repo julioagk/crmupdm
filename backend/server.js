@@ -76,9 +76,10 @@ if (fs.existsSync(distPath)) {
     });
 } else {
     // Si no existe dist (entorno desacoplado como Railway + Vercel)
-    app.get('*', (req, res) => {
+    // Manejador global para cualquier ruta no encontrada
+    app.use((req, res) => {
         if (req.path.startsWith('/api')) {
-            return res.status(404).json({ mensaje: 'Ruta API no encontrada' });
+            return res.status(404).json({ mensaje: `Ruta API no encontrada: ${req.method} ${req.path}` });
         }
         res.json({
             mensaje: '🚀 API CRM Infiniguard SYS - Backend Activo',
