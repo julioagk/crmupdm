@@ -197,6 +197,14 @@ const initDb = async () => {
   } catch (e) {
     console.error('❌ Error al inicializar o seedear DB:', e.message);
   }
+
+  // Migración: rellenar etapaEmbudo NULL con 'prospecto_nuevo'
+  try {
+    await db.exec("UPDATE clientes SET etapaEmbudo = 'prospecto_nuevo' WHERE etapaEmbudo IS NULL");
+    console.log('✅ Migración etapaEmbudo completada');
+  } catch (e) {
+    console.error('⚠️ Migración etapaEmbudo falló (no crítico):', e.message);
+  }
 };
 
 initDb();

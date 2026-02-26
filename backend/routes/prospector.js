@@ -196,6 +196,8 @@ router.get('/prospectos', [auth, esProspector], async (req, res) => {
         const rows = await db.prepare(sql).all(...params);
         const prospectos = rows.map(r => {
             const { closerNombre, ...c } = r;
+            // Fallback: si etapaEmbudo es null, usar 'prospecto_nuevo'
+            if (!c.etapaEmbudo) c.etapaEmbudo = 'prospecto_nuevo';
             const out = toMongoFormat(c);
             if (out && closerNombre) out.closerAsignado = { nombre: closerNombre };
             return out || c;
