@@ -67,10 +67,12 @@ router.post('/login', async (req, res) => {
 // @access  Public
 router.post('/register', async (req, res) => {
     try {
-        const { usuario, contraseña, nombre, email, telefono, rol } = req.body;
+        let { usuario, contraseña, nombre, email, telefono, rol } = req.body;
 
-        if (!usuario || !contraseña || !nombre || !rol) {
-            return res.status(400).json({ mensaje: 'Por favor complete todos los campos obligatorios' });
+        if (!rol) rol = 'closer'; // Default role for new registrations
+
+        if (!usuario || !contraseña || !nombre) {
+            return res.status(400).json({ mensaje: 'Por favor complete todos los campos obligatorios (usuario, contraseña, nombre)' });
         }
 
         const existe = await db.prepare('SELECT * FROM usuarios WHERE usuario = ?').get(usuario.trim());
