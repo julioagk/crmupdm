@@ -26,30 +26,35 @@ if (process.env.DATABASE_URL) {
   internalDb.pragma('journal_mode = WAL');
 }
 
-// Helper para convertir '?' a '$1', '$2', etc. para Postgres y poner comillas en columnas camelCase
+// Helper para convertir '?' a '$1', '$2', etc. para Postgres
 const convertSql = (sql) => {
   if (!isPostgres) return sql;
   let count = 1;
-  let res = sql.replace(/\?/g, () => `$${count++}`);
+  return sql.replace(/\?/g, () => `$${count++}`);
+};
 
-  // Postgres por defecto convierte las columnas a minúsculas si no tienen comillas dobles.
-  // Protegemos las columnas que creamos en camelCase:
-  const camelCols = [
-    'apellidoPaterno', 'apellidoMaterno', 'etapaEmbudo', 'prospectorAsignado',
-    'closerAsignado', 'fechaTransferencia', 'fechaUltimaEtapa', 'historialEmbudo',
-    'vendedorAsignado', 'fechaRegistro', 'ultimaInteraccion', 'proximaLlamada',
-    'cambioEtapa', 'etapaAnterior', 'etapaNueva', 'fechaLimite', 'fechaCreacion',
-    'googleRefreshToken', 'googleAccessToken', 'googleTokenExpiry',
-    'vendedorNombre', 'vendedorRol', 'closerNombre'
-  ];
+// Mapa para restaurar camelCase de postgres que devuelve todo en minúsculas
+const pgMap = {
+  apellidopaterno: 'apellidoPaterno', apellidomaterno: 'apellidoMaterno',
+  etapaembudo: 'etapaEmbudo', prospectorasignado: 'prospectorAsignado',
+  closerasignado: 'closerAsignado', fechatransferencia: 'fechaTransferencia',
+  fechaultimaetapa: 'fechaUltimaEtapa', historialembudo: 'historialEmbudo',
+  vendedorasignado: 'vendedorAsignado', fecharegistro: 'fechaRegistro',
+  ultimainteraccion: 'ultimaInteraccion', proximallamada: 'proximaLlamada',
+  cambioetapa: 'cambioEtapa', etapaanterior: 'etapaAnterior',
+  etapanueva: 'etapaNueva', fechalimite: 'fechaLimite',
+  fechacreacion: 'fechaCreacion', googlerefreshtoken: 'googleRefreshToken',
+  googleaccesstoken: 'googleAccessToken', googletokenexpiry: 'googleTokenExpiry',
+  vendedornombre: 'vendedorNombre', vendedorrol: 'vendedorRol', closernombre: 'closerNombre'
+};
 
-  camelCols.forEach(col => {
-    // Expresión regular para reemplazar la palabra exacta sin alterar strings
-    const reg = new RegExp(`\\b${col}\\b(?=([^']*'[^']*')*[^']*$)`, 'g');
-    res = res.replace(reg, `"${col}"`);
-  });
-
-  return res;
+const mapPgRow = (row) => {
+  if (!row) return row;
+  const mapped = {};
+  for (const key in row) {
+    mapped[pgMap[key] || key] = row[key];
+  }
+  return mapped;
 };
 
 // Shim para imitar better-sqlite3 de forma asíncrona
@@ -64,7 +69,7 @@ const db = {
       get: async (...params) => {
         if (isPostgres) {
           const res = await internalDb.query(finalSql, params);
-          return res.rows[0];
+          return mapPgRow(res.rows[0]);
         } else {
           return internalDb.prepare(sql).get(...params);
         }
@@ -72,7 +77,7 @@ const db = {
       all: async (...params) => {
         if (isPostgres) {
           const res = await internalDb.query(finalSql, params);
-          return res.rows;
+          return res.rows.map(mapPgRow);
         } else {
           return internalDb.prepare(sql).all(...params);
         }
