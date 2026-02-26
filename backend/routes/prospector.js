@@ -518,8 +518,9 @@ router.put('/prospectos/:id', auth, async (req, res) => {
 router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
     try {
         const prospectoId = parseInt(req.params.id);
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, ubicacion, notas } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, ubicacion, notas, etapaEmbudo } = req.body;
         const prospectorId = parseInt(req.usuario.id);
+        const now = new Date().toISOString();
 
         if (!nombres || !telefono) {
             return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
