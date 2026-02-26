@@ -67,33 +67,48 @@ router.post('/login', async (req, res) => {
 // @access  Public
 router.post('/register', async (req, res) => {
     try {
+        console.log('📝 Intento de registro recibido:', { ...req.body, contraseña: '***' });
         let { usuario, contraseña, nombre, email, telefono, rol } = req.body;
 
-        if (!rol) rol = 'closer'; // Default role for new registrations
+        if (!rol) rol = 'closer';
 
         if (!usuario || !contraseña || !nombre) {
+            console.log('⚠️ Registro fallido: Faltan campos obligatorios');
             return res.status(400).json({ mensaje: 'Por favor complete todos los campos obligatorios (usuario, contraseña, nombre)' });
         }
 
         const existe = await db.prepare('SELECT * FROM usuarios WHERE usuario = ?').get(usuario.trim());
         if (existe) {
+            console.log('⚠️ Registro fallido: Usuario ya existe:', usuario);
             return res.status(400).json({ mensaje: 'El nombre de usuario ya está en uso' });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(contraseña, salt);
 
-        const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
-        const result = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
+        // Para Postgres necesitamos RETURNING id para obtener el ID generado
+        // El shim manejará el reemplazo de ? por $1 etc.
+        const isPostgres = process.env.DATABASE_URL ? true : false;
+        let result;
+        if (isPostgres) {
+            const query = 'INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?) RETURNING id';
+            const stmt = await db.prepare(query);
+            const resVal = await stmt.get(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
+            result = { lastInsertRowid: resVal.id };
+        } else {
+            const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
+            result = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
+        }
 
         const newUser = await db.prepare('SELECT id, usuario, nombre, rol, email FROM usuarios WHERE id = ?').get(result.lastInsertRowid);
 
+        console.log('✅ Usuario registrado con éxito:', newUser.usuario);
         res.status(201).json({
             mensaje: 'Usuario registrado exitosamente',
             usuario: newUser
         });
     } catch (error) {
-        console.error('Error en registro:', error);
+        console.error('❌ Error en registro:', error);
         res.status(500).json({ mensaje: 'Error del servidor' });
     }
 });
