@@ -4,7 +4,6 @@
  */
 
 const { Pool } = require('pg');
-const Database = require('better-sqlite3');
 const path = require('path');
 
 let internalDb;
@@ -21,6 +20,7 @@ if (process.env.DATABASE_URL) {
   isPostgres = true;
 } else {
   console.log('🔧 Inicializando base de datos local SQLite...');
+  const Database = require('better-sqlite3');
   const dbPath = process.env.SQLITE_PATH || path.join(__dirname, '..', 'database.db');
   internalDb = new Database(dbPath);
   internalDb.pragma('journal_mode = WAL');
@@ -163,8 +163,25 @@ const initDb = async () => {
   try {
     await db.exec(finalSql);
     console.log('✅ Base de datos inicializada');
+
+    // Verificar si ya hay usuarios; si no, insertar los predeterminados
+    const userCount = await db.prepare('SELECT COUNT(*) as count FROM usuarios').get();
+    if (userCount && parseInt(userCount.count) === 0) {
+      console.log('🌱 Base de datos vacía, insertando usuarios predeterminados...');
+      const bcrypt = require('bcryptjs');
+      const hashProspector = await bcrypt.hash('prospector123', 10);
+      const hashCloser = await bcrypt.hash('closer123', 10);
+
+      await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('prospector', hashProspector, 'prospector', 'Alex Mendoza', 'prospector@crm.com', '5554444444');
+
+      await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('closer', hashCloser, 'closer', 'Fernando Ruiz', 'closer@crm.com', '5555555555');
+
+      console.log('✅ Usuarios predeterminados creados');
+    }
   } catch (e) {
-    console.error('❌ Error al inicializar DB:', e.message);
+    console.error('❌ Error al inicializar o seedear DB:', e.message);
   }
 };
 
