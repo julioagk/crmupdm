@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const db = require('../config/database');
+const { db } = require('../config/database');
 const { auth, esSuperUser } = require('../middleware/auth');
 
 // Helper para formatear respuesta (simulando lo que hacía toMongoFormat si es necesario, o simplificando)

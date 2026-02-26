@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { OAuth2Client } = require('google-auth-library');
 const { google } = require('googleapis');
-const db = require('../config/database');
+const { db } = require('../config/database');
 const { auth } = require('../middleware/auth');
 
 const oAuth2Client = new OAuth2Client(

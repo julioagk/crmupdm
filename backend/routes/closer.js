@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { db, isPostgres } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
 
@@ -721,25 +721,46 @@ router.post('/marcar-evento-completado', [auth, esCloser], async (req, res) => {
         const closerId = parseInt(req.usuario.id);
         const now = new Date().toISOString();
 
-        // Crear tabla si no existe (Ajustado para SQLite/Postgres)
-        await db.exec(`
-            CREATE TABLE IF NOT EXISTS google_events_completed (
-                id INTEGER PRIMARY KEY,
+        // Crear tabla si no existe (Ajustado para SERIAL en Postgres)
+        const createTableSql = isPostgres
+            ? `CREATE TABLE IF NOT EXISTS google_events_completed (
+                id SERIAL PRIMARY KEY,
                 googleEventId TEXT NOT NULL UNIQUE,
                 closerId INTEGER NOT NULL,
                 clienteId INTEGER,
                 resultado TEXT,
                 notas TEXT,
                 fechaCompletado TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
+              )`
+            : `CREATE TABLE IF NOT EXISTS google_events_completed (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                googleEventId TEXT NOT NULL UNIQUE,
+                closerId INTEGER NOT NULL,
+                clienteId INTEGER,
+                resultado TEXT,
+                notas TEXT,
+                fechaCompletado TEXT DEFAULT CURRENT_TIMESTAMP
+              )`;
+        await db.exec(createTableSql);
 
-        // Guardar o actualizar
-        await db.prepare(`
-            INSERT OR REPLACE INTO google_events_completed 
-            (googleEventId, closerId, clienteId, resultado, notas) 
-            VALUES (?, ?, ?, ?, ?)
-        `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
+        // Guardar o actualizar (Compatible con ambos)
+        if (isPostgres) {
+            await db.prepare(`
+                INSERT INTO google_events_completed (googleEventId, closerId, clienteId, resultado, notas)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (googleEventId) DO UPDATE SET
+                closerId = EXCLUDED.closerId,
+                clienteId = EXCLUDED.clienteId,
+                resultado = EXCLUDED.resultado,
+                notas = EXCLUDED.notas
+            `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
+        } else {
+            await db.prepare(`
+                INSERT OR REPLACE INTO google_events_completed 
+                (googleEventId, closerId, clienteId, resultado, notas) 
+                VALUES (?, ?, ?, ?, ?)
+            `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
+        }
 
         console.log(`✅ Evento ${googleEventId} marcado como completado en BD`);
 
