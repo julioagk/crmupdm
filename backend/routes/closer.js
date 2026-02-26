@@ -82,8 +82,12 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
         hoyFinDate.setHours(23, 59, 59, 999);
         const hoyFin = hoyFinDate.toISOString();
 
-        const reunionesHoy = await db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND tipo = ? AND fecha >= ? AND fecha <= ?')
-            .all(closerId, 'cita', hoyInicio, hoyFin);
+        // FIX: Las citas agendadas deben filtrarse por closerAsignado, no por vendedor (que es el prospector)
+        const reunionesHoy = await db.prepare(`
+            SELECT a.* FROM actividades a
+            JOIN clientes c ON a.cliente = c.id
+            WHERE c.closerAsignado = ? AND a.tipo = 'cita' AND a.fecha >= ? AND a.fecha <= ?
+        `).all(closerId, hoyInicio, hoyFin);
 
         const actividadesHoy = await db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?')
             .all(closerId, hoyInicio, hoyFin);

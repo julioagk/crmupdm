@@ -31,18 +31,22 @@ async function calcularPeriodoActividades(db, prospectorId, filtroFecha) {
 
 async function calcularPeriodoClientes(db, prospectorId, filtroFechaRegistro) {
     const where = filtroFechaRegistro ? `AND ${filtroFechaRegistro}` : '';
-    // Excluir prospectos perdidos y ventas ganadas del conteo de "prospectos nuevos"
+    // UNIFICADO: Contar prospectos donde el usuario ha tenido actividad o está asignado
     const row = await db.prepare(
-        `SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo NOT IN ('perdido', 'venta_ganada') ${where}`
-    ).get(prospectorId);
+        `SELECT COUNT(DISTINCT id) as c FROM clientes 
+         WHERE (prospectorAsignado = ? OR id IN (SELECT cliente FROM actividades WHERE vendedor = ?))
+         AND etapaEmbudo NOT IN ('perdido', 'venta_ganada') ${where}`
+    ).get(prospectorId, prospectorId);
     return row?.c || 0;
 }
 
 // Reuniones: filtrar por fechaUltimaEtapa (momento en que se agendó/cambió a esa etapa)
 async function calcularPeriodoReuniones(db, prospectorId, filtroFechaEtapa) {
     const where = filtroFechaEtapa ? `AND ${filtroFechaEtapa}` : '';
+    // UNIFICADO: Contar reuniones agendadas por el usuario (actividades tipo cita)
     const row = await db.prepare(
-        `SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo IN ('reunion_agendada','reunion_realizada','venta_ganada') ${where}`
+        `SELECT COUNT(DISTINCT cliente) as c FROM actividades 
+         WHERE vendedor = ? AND tipo = 'cita' ${where}`
     ).get(prospectorId);
     return row?.c || 0;
 }
@@ -51,9 +55,12 @@ async function calcularPeriodoReuniones(db, prospectorId, filtroFechaEtapa) {
 router.get('/dashboard', [auth, esProspector], async (req, res) => {
     try {
         const prospectorId = parseInt(req.usuario.id);
-        const clientes = await db.prepare(
-            'SELECT * FROM clientes WHERE prospectorAsignado = ?'
-        ).all(prospectorId);
+        // UNIFICADO: Ver todos los clientes donde el usuario está asignado o ha tenido actividad
+        const clientes = await db.prepare(`
+            SELECT DISTINCT c.* FROM clientes c
+            LEFT JOIN actividades a ON c.id = a.cliente
+            WHERE c.prospectorAsignado = ? OR a.vendedor = ? OR c.prospectorAsignado IS NULL
+        `).all(prospectorId, prospectorId);
 
         // Filtrar solo prospectos activos (excluir perdidos y ventas ganadas)
         const clientesActivos = clientes.filter(c =>
