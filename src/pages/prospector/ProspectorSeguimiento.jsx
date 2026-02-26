@@ -183,7 +183,18 @@ const ProspectorSeguimiento = () => {
     };
 
     useEffect(() => {
-        cargarDatos();
+        const init = async () => {
+            await cargarDatos();
+            // Si venimos de otra página con un ID seleccionado
+            if (location.state?.selectedId) {
+                const res = await axios.get(`${API_URL}/api/${rolePath}/prospectos`, { headers: getAuthHeaders() });
+                const found = res.data.find(p => p.id === location.state.selectedId || p._id === location.state.selectedId);
+                if (found) {
+                    handleSeleccionarProspecto(found);
+                }
+            }
+        };
+        init();
     }, []);
 
     // Orden de prioridad de etapas (más avanzadas primero, perdido al fondo)
@@ -691,9 +702,14 @@ const ProspectorSeguimiento = () => {
                             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                     <div>
-                                        <h1 className="text-2xl font-bold text-gray-900">
-                                            {prospectoSeleccionado.nombres} {prospectoSeleccionado.apellidoPaterno}
-                                        </h1>
+                                        <div className="flex items-center gap-3">
+                                            <h1 className="text-2xl font-bold text-gray-900">
+                                                {prospectoSeleccionado.nombres} {prospectoSeleccionado.apellidoPaterno}
+                                            </h1>
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getEtapaColor(prospectoSeleccionado.etapaEmbudo)}`}>
+                                                {getEtapaLabel(prospectoSeleccionado.etapaEmbudo)}
+                                            </span>
+                                        </div>
                                         {prospectoSeleccionado.empresa && (
                                             <p className="text-gray-500 mt-0.5">{prospectoSeleccionado.empresa}</p>
                                         )}
