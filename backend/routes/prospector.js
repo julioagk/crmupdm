@@ -141,11 +141,11 @@ router.get('/dashboard', [auth, esProspector], async (req, res) => {
             mes: `(fechaRegistro >= '${startOfMonth} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfMonth} 00:00:00'))`,
             total: null
         };
-        // Reuniones agendadas: campo 'fechaUltimaEtapa'
+        // Reuniones agendadas: campo 'fecha' (en tabla actividades)
         const FILTROS_REUNION = {
-            dia: `fechaUltimaEtapa >= '${startOfDay} 00:00:00' AND fechaUltimaEtapa <= '${startOfDay} 23:59:59'`,
-            semana: `fechaUltimaEtapa >= '${startOfWeek} 00:00:00'`,
-            mes: `fechaUltimaEtapa >= '${startOfMonth} 00:00:00'`,
+            dia: `fecha >= '${startOfDay} 00:00:00' AND fecha <= '${startOfDay} 23:59:59'`,
+            semana: `fecha >= '${startOfWeek} 00:00:00'`,
+            mes: `fecha >= '${startOfMonth} 00:00:00'`,
             total: null
         };
 
