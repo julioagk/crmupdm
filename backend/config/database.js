@@ -26,11 +26,30 @@ if (process.env.DATABASE_URL) {
   internalDb.pragma('journal_mode = WAL');
 }
 
-// Helper para convertir '?' a '$1', '$2', etc. para Postgres
+// Helper para convertir '?' a '$1', '$2', etc. para Postgres y poner comillas en columnas camelCase
 const convertSql = (sql) => {
   if (!isPostgres) return sql;
   let count = 1;
-  return sql.replace(/\?/g, () => `$${count++}`);
+  let res = sql.replace(/\?/g, () => `$${count++}`);
+
+  // Postgres por defecto convierte las columnas a minúsculas si no tienen comillas dobles.
+  // Protegemos las columnas que creamos en camelCase:
+  const camelCols = [
+    'apellidoPaterno', 'apellidoMaterno', 'etapaEmbudo', 'prospectorAsignado',
+    'closerAsignado', 'fechaTransferencia', 'fechaUltimaEtapa', 'historialEmbudo',
+    'vendedorAsignado', 'fechaRegistro', 'ultimaInteraccion', 'proximaLlamada',
+    'cambioEtapa', 'etapaAnterior', 'etapaNueva', 'fechaLimite', 'fechaCreacion',
+    'googleRefreshToken', 'googleAccessToken', 'googleTokenExpiry',
+    'vendedorNombre', 'vendedorRol', 'closerNombre'
+  ];
+
+  camelCols.forEach(col => {
+    // Expresión regular para reemplazar la palabra exacta sin alterar strings
+    const reg = new RegExp(`\\b${col}\\b(?=([^']*'[^']*')*[^']*$)`, 'g');
+    res = res.replace(reg, `"${col}"`);
+  });
+
+  return res;
 };
 
 // Shim para imitar better-sqlite3 de forma asíncrona
