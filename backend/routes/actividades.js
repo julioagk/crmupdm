@@ -10,32 +10,32 @@ router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
     try {
         const clienteId = parseInt(req.params.clienteId);
         const usuarioId = parseInt(req.usuario.id);
-        
+
         // Obtener cliente
-        const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(clienteId);
+        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(clienteId);
         if (!cliente) {
             return res.status(404).json({ msg: 'Cliente no encontrado' });
         }
-        
+
         // Validar permisos: prospector, closer asignado o admin
         const rol = String(req.usuario.rol).toLowerCase();
         const esProspectorAsignado = cliente.prospectorAsignado === usuarioId && rol === 'prospector';
         const esCloserAsignado = cliente.closerAsignado === usuarioId && rol === 'closer';
         const esSuperUser = rol === 'admin' || rol === 'superuser';
-        
+
         if (!esProspectorAsignado && !esCloserAsignado && !esSuperUser) {
             return res.status(403).json({ msg: 'No tienes permiso para ver este historial' });
         }
-        
+
         // Obtener TODAS las actividades con información del vendedor
-        const actividades = db.prepare(`
+        const actividades = await db.prepare(`
             SELECT a.*, u.nombre as vendedorNombre, u.rol as vendedorRol
             FROM actividades a
             LEFT JOIN usuarios u ON a.vendedor = u.id
             WHERE a.cliente = ?
             ORDER BY a.fecha ASC
         `).all(clienteId);
-        
+
         // Obtener historial del embudo
         let historialEmbudo = [];
         if (cliente.historialEmbudo) {
@@ -45,10 +45,10 @@ router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
                 console.error('Error al parsear historialEmbudo:', e);
             }
         }
-        
+
         // Construir timeline completo
         const timeline = [];
-        
+
         // Agregar cambios de etapa
         historialEmbudo.forEach(h => {
             timeline.push({
@@ -61,7 +61,7 @@ router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
                 timestamp: new Date(h.fecha).getTime()
             });
         });
-        
+
         // Agregar actividades
         actividades.forEach(a => {
             timeline.push({
@@ -78,24 +78,24 @@ router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
                 timestamp: new Date(a.fecha).getTime()
             });
         });
-        
+
         // Ordenar por fecha
         timeline.sort((a, b) => a.timestamp - b.timestamp);
-        
+
         // Obtener información de prospector y closer
         let prospectorInfo = null;
         let closerInfo = null;
-        
+
         if (cliente.prospectorAsignado) {
-            const p = db.prepare('SELECT id, nombre, email FROM usuarios WHERE id = ?').get(cliente.prospectorAsignado);
+            const p = await db.prepare('SELECT id, nombre, email FROM usuarios WHERE id = ?').get(cliente.prospectorAsignado);
             if (p) prospectorInfo = { id: p.id, nombre: p.nombre, email: p.email };
         }
-        
+
         if (cliente.closerAsignado) {
-            const c = db.prepare('SELECT id, nombre, email FROM usuarios WHERE id = ?').get(cliente.closerAsignado);
+            const c = await db.prepare('SELECT id, nombre, email FROM usuarios WHERE id = ?').get(cliente.closerAsignado);
             if (c) closerInfo = { id: c.id, nombre: c.nombre, email: c.email };
         }
-        
+
         res.json({
             cliente: toMongoFormat(cliente) || cliente,
             timeline,
@@ -109,10 +109,10 @@ router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
                 closerAsignado: closerInfo,
                 vendedoresInvolucrados: [...new Set([
                     ...actividades.map(a => a.vendedorNombre).filter(Boolean),
-                    ...historialEmbudo.map(h => {
-                        const user = db.prepare('SELECT nombre FROM usuarios WHERE id = ?').get(h.vendedor);
+                    ...await Promise.all(historialEmbudo.map(async h => {
+                        const user = await db.prepare('SELECT nombre FROM usuarios WHERE id = ?').get(h.vendedor);
                         return user?.nombre;
-                    }).filter(Boolean)
+                    })).then(results => results.filter(Boolean))
                 ])]
             }
         });
@@ -137,7 +137,7 @@ router.get('/', auth, esSuperUser, async (req, res) => {
             params.push(parseInt(req.query.clienteId));
         }
         sql += ' ORDER BY a.fecha DESC LIMIT 100';
-        const rows = db.prepare(sql).all(...params);
+        const rows = await db.prepare(sql).all(...params);
         const actividades = rows.map(r => ({
             ...toMongoFormat(r),
             vendedor: { nombre: r.vendedorNombre },
@@ -153,16 +153,16 @@ router.post('/', auth, esSuperUser, async (req, res) => {
     try {
         const { tipo, cliente, descripcion, resultado, notas } = req.body;
         if (!tipo || !cliente) return res.status(400).json({ mensaje: 'Tipo y cliente requeridos' });
-        const c = db.prepare('SELECT * FROM clientes WHERE id = ?').get(parseInt(cliente));
+        const c = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(parseInt(cliente));
         if (!c) return res.status(404).json({ mensaje: 'Cliente no encontrado' });
         if (req.usuario.rol === 'vendedor' && c.vendedorAsignado !== parseInt(req.usuario.id)) {
             return res.status(403).json({ mensaje: 'No tiene permiso' });
         }
         const now = new Date().toISOString();
-        db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?)')
+        await db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?)')
             .run(tipo, parseInt(req.usuario.id), parseInt(cliente), descripcion || '', resultado || 'pendiente', notas || '');
-        db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, parseInt(cliente));
-        const row = db.prepare('SELECT * FROM actividades ORDER BY id DESC LIMIT 1').get();
+        await db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, parseInt(cliente));
+        const row = await db.prepare('SELECT * FROM actividades ORDER BY id DESC LIMIT 1').get();
         res.status(201).json({ mensaje: 'Actividad registrada', actividad: toMongoFormat(row) || row });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });
@@ -171,7 +171,7 @@ router.post('/', auth, esSuperUser, async (req, res) => {
 
 router.put('/:id', auth, esSuperUser, async (req, res) => {
     try {
-        const a = db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
+        const a = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
         if (!a) return res.status(404).json({ mensaje: 'Actividad no encontrada' });
         if (req.usuario.rol === 'vendedor' && a.vendedor !== parseInt(req.usuario.id)) {
             return res.status(403).json({ mensaje: 'No tiene permiso' });
@@ -184,9 +184,9 @@ router.put('/:id', auth, esSuperUser, async (req, res) => {
         if (notas !== undefined) { updates.push('notas = ?'); params.push(notas); }
         if (updates.length) {
             params.push(parseInt(req.params.id));
-            db.prepare(`UPDATE actividades SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+            await db.prepare(`UPDATE actividades SET ${updates.join(', ')} WHERE id = ?`).run(...params);
         }
-        const row = db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
+        const row = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
         res.json({ mensaje: 'Actividad actualizada', actividad: toMongoFormat(row) || row });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });

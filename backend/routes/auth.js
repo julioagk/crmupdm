@@ -16,7 +16,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ mensaje: 'Por favor ingrese usuario y contraseña' });
         }
 
-        const row = db.prepare('SELECT * FROM usuarios WHERE usuario = ?').get(usuario.trim());
+        const row = await db.prepare('SELECT * FROM usuarios WHERE usuario = ?').get(usuario.trim());
         if (!row) {
             return res.status(400).json({ mensaje: 'Credenciales inválidas' });
         }
@@ -67,7 +67,7 @@ router.post('/login', async (req, res) => {
 // @access  Private
 router.get('/me', auth, async (req, res) => {
     try {
-        const user = db.prepare('SELECT id, usuario, nombre, rol, email, telefono, activo FROM usuarios WHERE id = ?').get(req.usuario.id);
+        const user = await db.prepare('SELECT id, usuario, nombre, rol, email, telefono, activo FROM usuarios WHERE id = ?').get(req.usuario.id);
         res.json(user);
     } catch (error) {
         console.error('Error en auth/me:', error);

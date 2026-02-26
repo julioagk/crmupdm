@@ -62,16 +62,31 @@ app.get('/health', (req, res) => {
 
 // ✅ SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND (React compilado)
 const distPath = path.join(__dirname, '../dist');
-app.use(express.static(distPath));
+const fs = require('fs');
 
-// ✅ FALLBACK PARA SPA REACT - Cualquier ruta que no sea /api redirige a index.html
-app.get('*', (req, res) => {
-    // No servir para rutas /api
-    if (req.path.startsWith('/api')) {
-        return res.status(404).json({ mensaje: 'Ruta API no encontrada' });
-    }
-    res.sendFile(path.join(distPath, 'index.html'));
-});
+if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+
+    // ✅ FALLBACK PARA SPA REACT - Solo si existe dist
+    app.get('*', (req, res) => {
+        if (req.path.startsWith('/api')) {
+            return res.status(404).json({ mensaje: 'Ruta API no encontrada' });
+        }
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    // Si no existe dist (entorno desacoplado como Railway + Vercel)
+    app.get('*', (req, res) => {
+        if (req.path.startsWith('/api')) {
+            return res.status(404).json({ mensaje: 'Ruta API no encontrada' });
+        }
+        res.json({
+            mensaje: '🚀 API CRM Infiniguard SYS - Backend Activo',
+            estado: 'El frontend se sirve por separado (Vercel)',
+            endpoint_api: '/api'
+        });
+    });
+}
 
 // Manejo de errores global
 app.use((err, req, res, next) => {

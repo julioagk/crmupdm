@@ -24,7 +24,7 @@ router.get('/', auth, async (req, res) => {
     try {
         // Permitir a todos los autenticados ver la lista de usuarios (para el sidebar)
         // O restringir si es necesario. Por ahora abierto a autenticados.
-        const rows = db.prepare('SELECT id, usuario, nombre, rol, email, telefono, activo, fechaCreacion, googleRefreshToken, googleAccessToken FROM usuarios WHERE activo = 1 ORDER BY nombre ASC').all();
+        const rows = await db.prepare('SELECT id, usuario, nombre, rol, email, telefono, activo, fechaCreacion, googleRefreshToken, googleAccessToken FROM usuarios WHERE activo = 1 ORDER BY nombre ASC').all();
         res.json(rows.map(formatUser));
     } catch (error) {
         console.error("Error in GET /api/usuarios:", error);
@@ -43,15 +43,15 @@ router.post('/', auth, esSuperUser, async (req, res) => {
             return res.status(400).json({ mensaje: 'Complete los campos requeridos' });
         }
 
-        const existe = db.prepare('SELECT id FROM usuarios WHERE usuario = ?').get(usuario.trim());
+        const existe = await db.prepare('SELECT id FROM usuarios WHERE usuario = ?').get(usuario.trim());
         if (existe) return res.status(400).json({ mensaje: 'Usuario ya existe' });
 
         const hash = await bcrypt.hash(contraseña, 10);
 
-        const stmt = db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
-        const info = stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
+        const stmt = await db.prepare('INSERT INTO usuarios (usuario, contraseña, rol, nombre, email, telefono) VALUES (?, ?, ?, ?, ?, ?)');
+        const info = await stmt.run(usuario.trim(), hash, rol, nombre.trim(), (email || '').trim(), (telefono || '').trim());
 
-        const row = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(info.lastInsertRowid);
+        const row = await db.prepare('SELECT * FROM usuarios WHERE id = ?').get(info.lastInsertRowid);
         res.status(201).json({ mensaje: 'Usuario creado', usuario: formatUser(row) });
     } catch (error) {
         console.error("Error creating user:", error);
@@ -67,7 +67,7 @@ router.put('/:id', auth, esSuperUser, async (req, res) => {
         const { nombre, email, telefono, activo, contraseña, rol } = req.body;
         const id = parseInt(req.params.id);
 
-        const row = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+        const row = await db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
         if (!row) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
         const updates = [];
@@ -86,10 +86,10 @@ router.put('/:id', auth, esSuperUser, async (req, res) => {
 
         if (updates.length > 0) {
             params.push(id);
-            db.prepare(`UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+            await db.prepare(`UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`).run(...params);
         }
 
-        const updated = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+        const updated = await db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
         res.json({ mensaje: 'Usuario actualizado', usuario: formatUser(updated) });
     } catch (error) {
         console.error("Error updating user:", error);
@@ -102,7 +102,7 @@ router.put('/:id', auth, esSuperUser, async (req, res) => {
 // @access  Private (Admin)
 router.delete('/:id', auth, esSuperUser, async (req, res) => {
     try {
-        db.prepare('UPDATE usuarios SET activo = 0 WHERE id = ?').run(parseInt(req.params.id));
+        await db.prepare('UPDATE usuarios SET activo = 0 WHERE id = ?').run(parseInt(req.params.id));
         res.json({ mensaje: 'Usuario desactivado' });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });

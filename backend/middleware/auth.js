@@ -16,7 +16,7 @@ const auth = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
 
         // Verificar que el usuario exista y esté activo
-        const row = db.prepare('SELECT id, usuario, nombre, rol, email, telefono, activo FROM usuarios WHERE id = ?').get(decoded.id);
+        const row = await db.prepare('SELECT id, usuario, nombre, rol, email, telefono, activo FROM usuarios WHERE id = ?').get(decoded.id);
 
         if (!row) {
             return res.status(401).json({ mensaje: 'Token inválido - Usuario no encontrado' });
