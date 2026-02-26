@@ -3,7 +3,7 @@ set -e
 
 echo "🔨 Instalando dependencias del backend..."
 cd backend
-npm install
+npm install --omit=dev
 cd ..
 
 echo "🚀 Iniciando servidor..."
