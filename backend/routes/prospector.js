@@ -283,7 +283,7 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
 // POST /api/prospector/registrar-actividad
 router.post('/registrar-actividad', [auth, esProspector], async (req, res) => {
     try {
-        const { clienteId, tipo, resultado, descripcion, notas, fechaCita } = req.body;
+        const { clienteId, tipo, resultado, descripcion, notas, fechaCita, etapaEmbudo, proximaLlamada, interes } = req.body;
         const tiposValidos = ['llamada', 'mensaje', 'correo', 'whatsapp', 'cita', 'prospecto'];
         const resultadosValidos = ['exitoso', 'pendiente', 'fallido'];
 
@@ -319,14 +319,50 @@ router.post('/registrar-actividad', [auth, esProspector], async (req, res) => {
         `).run(tipo, prospectorId, cid, fechaActividad, descripcion || `${tipo} registrada`, resultadoFinal, notas || '');
 
         const now = new Date().toISOString();
-        await db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, cid);
+        const updates = ['ultimaInteraccion = ?'];
+        const params = [now];
 
-        if (tipo === 'llamada' && resultadoFinal === 'exitoso' && cliente.etapaEmbudo === 'prospecto_nuevo') {
-            const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
-            hist.push({ etapa: 'en_contacto', fecha: now, vendedor: prospectorId });
-            await db.prepare('UPDATE clientes SET etapaEmbudo = ?, fechaUltimaEtapa = ?, historialEmbudo = ? WHERE id = ?')
-                .run('en_contacto', now, JSON.stringify(hist), cid);
+        // Lógica de Seguimiento: Actualizar Campos del Cliente
+        if (proximaLlamada !== undefined) {
+            updates.push('proximaLlamada = ?');
+            params.push(proximaLlamada);
         }
+
+        if (interes !== undefined) {
+            updates.push('interes = ?');
+            params.push(parseInt(interes));
+        }
+
+        // Cambio manual o automático de etapa
+        let nuevaEtapa = (tipo === 'llamada' && resultadoFinal === 'exitoso' && cliente.etapaEmbudo === 'prospecto_nuevo')
+            ? 'en_contacto'
+            : etapaEmbudo;
+
+        if (nuevaEtapa && nuevaEtapa !== cliente.etapaEmbudo) {
+            updates.push('etapaEmbudo = ?');
+            params.push(nuevaEtapa);
+            updates.push('fechaUltimaEtapa = ?');
+            params.push(now);
+
+            const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
+            hist.push({
+                etapa: nuevaEtapa,
+                fecha: now,
+                vendedor: prospectorId,
+                descripcion: `Actividad (${tipo}): Cambio a ${nuevaEtapa}`
+            });
+            updates.push('historialEmbudo = ?');
+            params.push(JSON.stringify(hist));
+
+            // Sincronizar estado
+            if (nuevaEtapa === 'perdido') {
+                updates.push('estado = ?');
+                params.push('perdido');
+            }
+        }
+
+        params.push(cid);
+        await db.prepare(`UPDATE clientes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
         const actRow = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(ins.lastInsertRowid);
         const actividad = toMongoFormat(actRow);
@@ -683,7 +719,7 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
         await db.prepare(`
             INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas, cambioEtapa, etapaAnterior, etapaNueva)
             VALUES (?, ?, ?, ?, ?, 'pendiente', ?, 1, 'en_contacto', 'reunion_agendada')
-        `).run('cita', prospectorId, cid, fechaReunionISO, `Reunión agendada por prospector ${req.usuario.nombre} → Asignada a closer`, notas || '');
+        `).run('cita', prospectorId, cid, now, `Reunión agendada para el ${new Date(fechaReunion).toLocaleString()} por prospector ${req.usuario.nombre} → Asignada a closer`, notas || '');
 
         const clienteActualizado = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
         const actividadRow = await db.prepare('SELECT * FROM actividades WHERE cliente = ? ORDER BY id DESC LIMIT 1').get(cid);
