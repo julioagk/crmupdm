@@ -47,7 +47,9 @@ const normalizeRow = (row) => {
     vendedorasignado: 'vendedorAsignado',
     fecharegistro: 'fechaRegistro',
     ultimainteraccion: 'ultimaInteraccion',
-    apellido_paterno: 'apellidoPaterno', // Por si acaso hay variantes
+    apellidopaterno: 'apellidoPaterno',
+    apellidomaterno: 'apellidoMaterno',
+    apellido_paterno: 'apellidoPaterno', // Fallback
     apellido_materno: 'apellidoMaterno',
     googlerefreshtoken: 'googleRefreshToken',
     googleaccesstoken: 'googleAccessToken',
