@@ -540,14 +540,40 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             (notas || '').trim(),
             req.body.interes !== undefined ? req.body.interes : 0,
             req.body.proximaLlamada || null,
-            prospectoId
-        );
+            new Date().toISOString() // ultimaInteraccion
+        ];
 
-res.json({ msg: 'Prospecto actualizado exitosamente' });
+        // Manejo de cambio de etapa
+        if (etapaEmbudo && etapaEmbudo !== cliente.etapaEmbudo) {
+            updates.push('etapaEmbudo = ?');
+            params.push(etapaEmbudo);
+            updates.push('fechaUltimaEtapa = ?');
+            params.push(now);
+
+            const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
+            hist.push({
+                etapa: etapaEmbudo,
+                fecha: now,
+                vendedor: prospectorId,
+                descripcion: `Edición: Cambio de etapa a ${etapaEmbudo}`
+            });
+            updates.push('historialEmbudo = ?');
+            params.push(JSON.stringify(hist));
+        }
+
+        params.push(prospectoId);
+
+        await db.prepare(`
+            UPDATE clientes 
+            SET ${updates.join(', ')}
+            WHERE id = ?
+        `).run(...params);
+
+        res.json({ msg: 'Prospecto actualizado exitosamente' });
     } catch (error) {
-    console.error('Error al editar prospecto:', error);
-    res.status(500).json({ msg: 'Error del servidor' });
-}
+        console.error('Error al editar prospecto:', error);
+        res.status(500).json({ msg: 'Error del servidor' });
+    }
 });
 
 // POST /api/prospector/agendar-reunion

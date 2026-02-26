@@ -650,16 +650,6 @@ router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
             SET ${updates.join(', ')}
             WHERE id = ?
         `).run(...params);
-        `).run(
-            nombres.trim(),
-            (apellidoPaterno || '').trim(),
-            (apellidoMaterno || '').trim(),
-            String(telefono).trim(),
-            String(correo || '').trim().toLowerCase(),
-            (empresa || '').trim(),
-            (notas || '').trim(),
-            prospectoId
-        );
 
         res.json({ msg: 'Prospecto actualizado exitosamente' });
     } catch (error) {
@@ -802,7 +792,7 @@ router.post('/marcar-evento-completado', [auth, esCloser], async (req, res) => {
             `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
         }
 
-        console.log(`✅ Evento ${ googleEventId } marcado como completado en BD`);
+        console.log(`✅ Evento ${googleEventId} marcado como completado en BD`);
 
         res.json({ msg: 'Evento marcado como completado', googleEventId });
     } catch (error) {
