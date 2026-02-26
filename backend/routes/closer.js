@@ -591,25 +591,65 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
 router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
     try {
         const prospectoId = parseInt(req.params.id);
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, etapaEmbudo, interes, proximaLlamada } = req.body;
+        const now = new Date().toISOString();
 
-        if (!nombres || !telefono) {
-            return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
+        const c = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
+        if (!c) return res.status(404).json({ msg: 'Prospecto no encontrado' });
+
+        const updates = [
+            'nombres = ?', 'apellidoPaterno = ?', 'apellidoMaterno = ?',
+            'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?',
+            'ultimaInteraccion = ?'
+        ];
+        const params = [
+            nombres.trim(),
+            (apellidoPaterno || '').trim(),
+            (apellidoMaterno || '').trim(),
+            String(telefono).trim(),
+            String(correo || '').trim().toLowerCase(),
+            (empresa || '').trim(),
+            (notas || '').trim(),
+            now
+        ];
+
+        if (interes !== undefined) { updates.push('interes = ?'); params.push(interes); }
+        if (proximaLlamada !== undefined) { updates.push('proximaLlamada = ?'); params.push(proximaLlamada); }
+
+        // Manejo de cambio de etapa
+        if (etapaEmbudo && etapaEmbudo !== c.etapaEmbudo) {
+            updates.push('etapaEmbudo = ?');
+            params.push(etapaEmbudo);
+            updates.push('fechaUltimaEtapa = ?');
+            params.push(now);
+
+            const hist = c.historialEmbudo ? JSON.parse(c.historialEmbudo) : [];
+            hist.push({
+                etapa: etapaEmbudo,
+                fecha: now,
+                vendedor: parseInt(req.usuario.id),
+                descripcion: `Edición (Closer): Cambio de etapa a ${etapaEmbudo}`
+            });
+            updates.push('historialEmbudo = ?');
+            params.push(JSON.stringify(hist));
+
+            // Sincronizar estado
+            if (etapaEmbudo === 'venta_ganada') {
+                updates.push('estado = ?');
+                params.push('ganado');
+            } else if (etapaEmbudo === 'perdido') {
+                updates.push('estado = ?');
+                params.push('perdido');
+            }
         }
 
-        const cliente = await db.prepare('SELECT id FROM clientes WHERE id = ?').get(prospectoId);
-        if (!cliente) return res.status(404).json({ msg: 'Prospecto no encontrado' });
-
-        // UNIFICADO: Acceso por rol
-        const rolesPermitidos = ['prospector', 'closer'];
-        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
-            return res.status(403).json({ msg: 'No tienes permiso para editar' });
-        }
+        params.push(prospectoId);
 
         await db.prepare(`
             UPDATE clientes 
-            SET nombres = ?, apellidoPaterno = ?, apellidoMaterno = ?, telefono = ?, correo = ?, empresa = ?, notas = ?
+            SET ${updates.join(', ')}
             WHERE id = ?
+        `).run(...params);
         `).run(
             nombres.trim(),
             (apellidoPaterno || '').trim(),
@@ -650,9 +690,9 @@ router.post('/pasar-a-cliente/:id', [auth, esCloser], async (req, res) => {
 
         // Registrar la actividad de conversión
         await db.prepare(`
-            INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run('prospecto', closerId, clienteId, now, 'Prospecto convertido a cliente', 'exitoso', notas || 'Convertido a cliente');
+            INSERT INTO actividades(tipo, vendedor, cliente, fecha, descripcion, resultado, notas)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
+            `).run('prospecto', closerId, clienteId, now, 'Prospecto convertido a cliente', 'exitoso', notas || 'Convertido a cliente');
 
         // Actualizar etapa del prospecto
         const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
@@ -690,8 +730,8 @@ router.post('/descartar-prospecto/:id', [auth, esCloser], async (req, res) => {
 
         // Registrar la actividad de descarte
         await db.prepare(`
-            INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO actividades(tipo, vendedor, cliente, fecha, descripcion, resultado, notas)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
         `).run('prospecto', closerId, clienteId, now, 'Prospecto descartado', 'fallido', notas || 'Descartado');
 
         // Actualizar etapa del prospecto
@@ -723,46 +763,46 @@ router.post('/marcar-evento-completado', [auth, esCloser], async (req, res) => {
 
         // Crear tabla si no existe (Ajustado para SERIAL en Postgres)
         const createTableSql = isPostgres
-            ? `CREATE TABLE IF NOT EXISTS google_events_completed (
-                id SERIAL PRIMARY KEY,
-                googleEventId TEXT NOT NULL UNIQUE,
-                closerId INTEGER NOT NULL,
-                clienteId INTEGER,
-                resultado TEXT,
-                notas TEXT,
-                fechaCompletado TEXT DEFAULT CURRENT_TIMESTAMP
-              )`
-            : `CREATE TABLE IF NOT EXISTS google_events_completed (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                googleEventId TEXT NOT NULL UNIQUE,
-                closerId INTEGER NOT NULL,
-                clienteId INTEGER,
-                resultado TEXT,
-                notas TEXT,
-                fechaCompletado TEXT DEFAULT CURRENT_TIMESTAMP
-              )`;
+            ? `CREATE TABLE IF NOT EXISTS google_events_completed(
+            id SERIAL PRIMARY KEY,
+            googleEventId TEXT NOT NULL UNIQUE,
+            closerId INTEGER NOT NULL,
+            clienteId INTEGER,
+            resultado TEXT,
+            notas TEXT,
+            fechaCompletado TEXT DEFAULT CURRENT_TIMESTAMP
+        )`
+            : `CREATE TABLE IF NOT EXISTS google_events_completed(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            googleEventId TEXT NOT NULL UNIQUE,
+            closerId INTEGER NOT NULL,
+            clienteId INTEGER,
+            resultado TEXT,
+            notas TEXT,
+            fechaCompletado TEXT DEFAULT CURRENT_TIMESTAMP
+        )`;
         await db.exec(createTableSql);
 
         // Guardar o actualizar (Compatible con ambos)
         if (isPostgres) {
             await db.prepare(`
-                INSERT INTO google_events_completed (googleEventId, closerId, clienteId, resultado, notas)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT (googleEventId) DO UPDATE SET
-                closerId = EXCLUDED.closerId,
-                clienteId = EXCLUDED.clienteId,
-                resultado = EXCLUDED.resultado,
-                notas = EXCLUDED.notas
-            `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
+                INSERT INTO google_events_completed(googleEventId, closerId, clienteId, resultado, notas)
+        VALUES(?, ?, ?, ?, ?)
+                ON CONFLICT(googleEventId) DO UPDATE SET
+        closerId = EXCLUDED.closerId,
+            clienteId = EXCLUDED.clienteId,
+            resultado = EXCLUDED.resultado,
+            notas = EXCLUDED.notas
+                `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
         } else {
             await db.prepare(`
-                INSERT OR REPLACE INTO google_events_completed 
-                (googleEventId, closerId, clienteId, resultado, notas) 
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO google_events_completed
+            (googleEventId, closerId, clienteId, resultado, notas)
+        VALUES(?, ?, ?, ?, ?)
             `).run(googleEventId, closerId, clienteId || null, resultado || null, notas || null);
         }
 
-        console.log(`✅ Evento ${googleEventId} marcado como completado en BD`);
+        console.log(`✅ Evento ${ googleEventId } marcado como completado en BD`);
 
         res.json({ msg: 'Evento marcado como completado', googleEventId });
     } catch (error) {

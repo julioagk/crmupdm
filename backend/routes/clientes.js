@@ -80,22 +80,63 @@ router.put('/:id', auth, esSuperUser, async (req, res) => {
         const c = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(parseInt(req.params.id));
         if (!c) return res.status(404).json({ mensaje: 'Cliente no encontrado' });
         if (req.usuario.rol === 'vendedor' && c.vendedorAsignado !== parseInt(req.usuario.id)) {
+            // Backward compatibility for 'vendedor' role if still exists
             return res.status(403).json({ mensaje: 'No tiene permiso' });
         }
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, estado, notas, vendedorAsignado } = req.body;
+
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, estado, notas, vendedorAsignado, etapaEmbudo } = req.body;
         const updates = [];
         const params = [];
+        const now = new Date().toISOString();
+
         if (nombres) { updates.push('nombres = ?'); params.push(nombres); }
         if (apellidoPaterno) { updates.push('apellidoPaterno = ?'); params.push(apellidoPaterno); }
         if (apellidoMaterno !== undefined) { updates.push('apellidoMaterno = ?'); params.push(apellidoMaterno); }
         if (telefono) { updates.push('telefono = ?'); params.push(telefono); }
         if (correo) { updates.push('correo = ?'); params.push(correo); }
         if (empresa !== undefined) { updates.push('empresa = ?'); params.push(empresa); }
-        if (estado) { updates.push('estado = ?'); params.push(estado); }
+
+        // Manejo de cambio de etapa
+        if (etapaEmbudo && etapaEmbudo !== c.etapaEmbudo) {
+            updates.push('etapaEmbudo = ?');
+            params.push(etapaEmbudo);
+            updates.push('fechaUltimaEtapa = ?');
+            params.push(now);
+
+            const hist = c.historialEmbudo ? JSON.parse(c.historialEmbudo) : [];
+            hist.push({
+                etapa: etapaEmbudo,
+                fecha: now,
+                vendedor: parseInt(req.usuario.id),
+                descripcion: `Cambio manual de etapa a: ${etapaEmbudo}`
+            });
+            updates.push('historialEmbudo = ?');
+            params.push(JSON.stringify(hist));
+
+            // Sincronizar estado si es ganado/perdido
+            if (etapaEmbudo === 'ganado' || etapaEmbudo === 'venta_ganada') {
+                updates.push('estado = ?');
+                params.push('ganado');
+            } else if (etapaEmbudo === 'perdido') {
+                updates.push('estado = ?');
+                params.push('perdido');
+            }
+        } else if (estado) {
+            updates.push('estado = ?');
+            params.push(estado);
+        }
+
         if (notas !== undefined) { updates.push('notas = ?'); params.push(notas); }
-        if (req.usuario.rol === 'admin' && vendedorAsignado) { updates.push('vendedorAsignado = ?'); params.push(parseInt(vendedorAsignado)); }
+
+        // Roles permitidos para reasignar
+        const esAdmin = req.usuario.rol === 'admin' || req.usuario.rol === 'closer';
+        if (esAdmin && vendedorAsignado) {
+            updates.push('vendedorAsignado = ?');
+            params.push(parseInt(vendedorAsignado));
+        }
+
         updates.push('ultimaInteraccion = ?');
-        params.push(new Date().toISOString(), parseInt(req.params.id));
+        params.push(now);
         await db.prepare(`UPDATE clientes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
         const row = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(parseInt(req.params.id));
         res.json({ mensaje: 'Cliente actualizado', cliente: toMongoFormat(row) || row });

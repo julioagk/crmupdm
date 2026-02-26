@@ -525,20 +525,12 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
         }
 
-        const cliente = await db.prepare('SELECT id, prospectorAsignado FROM clientes WHERE id = ?').get(prospectoId);
-        if (!cliente) return res.status(404).json({ msg: 'Prospecto no encontrado' });
-
-        // UNIFICADO: Acceso por rol
-        const rolesPermitidos = ['prospector', 'closer'];
-        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
-            return res.status(403).json({ msg: 'No tienes permiso para editar' });
-        }
-
-        await db.prepare(`
-            UPDATE clientes 
-            SET nombres = ?, apellidoPaterno = ?, apellidoMaterno = ?, telefono = ?, correo = ?, empresa = ?, notas = ?, interes = ?, proximaLlamada = ?
-            WHERE id = ?
-        `).run(
+        const updates = [
+            'nombres = ?', 'apellidoPaterno = ?', 'apellidoMaterno = ?',
+            'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?',
+            'interes = ?', 'proximaLlamada = ?', 'ultimaInteraccion = ?'
+        ];
+        const params = [
             nombres.trim(),
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
@@ -551,11 +543,11 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             prospectoId
         );
 
-        res.json({ msg: 'Prospecto actualizado exitosamente' });
+res.json({ msg: 'Prospecto actualizado exitosamente' });
     } catch (error) {
-        console.error('Error al editar prospecto:', error);
-        res.status(500).json({ msg: 'Error del servidor' });
-    }
+    console.error('Error al editar prospecto:', error);
+    res.status(500).json({ msg: 'Error del servidor' });
+}
 });
 
 // POST /api/prospector/agendar-reunion
