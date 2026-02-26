@@ -935,14 +935,15 @@ const ProspectorSeguimiento = () => {
                                                             const notasFin = llamadaFlow.notas || 'Interesado, llamar después';
                                                             const pidLocal = prospectoSeleccionado.id || prospectoSeleccionado._id;
 
-                                                            // 1. Registrar Actividad
-                                                            await axios.post(`${API_URL}/api/${rolePath}/registrar-actividad`,
-                                                                { clienteId: pidLocal, tipo: 'llamada', resultado: 'exitoso', notas: notasFin },
-                                                                { headers: getAuthHeaders() }
-                                                            );
+                                                            // 1. Registrar Actividad (usa el helper que auto-promueve la etapa)
+                                                            await registrarActividad({
+                                                                tipo: 'llamada',
+                                                                resultado: 'exitoso',
+                                                                notas: notasFin
+                                                            });
 
                                                             if (llamadaFlow.fechaProxima) {
-                                                                // 2. Crear Tarea
+                                                                // 2. Crear Tarea de seguimiento
                                                                 await axios.post(`${API_URL}/api/tareas`, {
                                                                     titulo: `Llamada de seguimiento: ${prospectoSeleccionado.nombres}`,
                                                                     descripcion: notasFin,
@@ -951,17 +952,14 @@ const ProspectorSeguimiento = () => {
                                                                     prioridad: 'media'
                                                                 }, { headers: getAuthHeaders() });
 
-                                                                // 3. Actualizar prospecto (interes y proximaLlamada)
-                                                                await axios.put(`${API_URL}/api/${rolePath}/prospectos/${pidLocal}/editar`, {
-                                                                    ...prospectoSeleccionado,
+                                                                // 3. Actualizar solo proximaLlamada (ruta simple, no requiere nombres/telefono)
+                                                                await axios.put(`${API_URL}/api/${rolePath}/prospectos/${pidLocal}`, {
                                                                     proximaLlamada: llamadaFlow.fechaProxima
                                                                 }, { headers: getAuthHeaders() });
                                                             }
 
                                                             toast.success('Seguimiento guardado correctamente');
                                                             setLlamadaFlow(null);
-                                                            cargarDatos(); // Recargar lista
-                                                            handleSeleccionarProspecto(prospectoSeleccionado); // Recargar timeline
                                                         } catch (err) {
                                                             console.error(err);
                                                             toast.error('Error al guardar el seguimiento completo');
