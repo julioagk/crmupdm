@@ -118,29 +118,34 @@ router.get('/dashboard', [auth, esProspector], async (req, res) => {
         };
 
         // Filtros por período calculados en JS para compatibilidad total (SQLite/Postgres)
-        const tomorrowLocal = new Date(nowLocal);
-        tomorrowLocal.setDate(nowLocal.getDate() + 1);
-        const startOfTomorrow = tomorrowLocal.toISOString().slice(0, 10);
+        const nowLocal = new Date();
+        const startOfDay = new Date(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()).toISOString().slice(0, 10);
 
-        // Actividades: campo 'fecha'. Usamos >= y < para ser robustos con formatos T o espacio.
+        const sixDaysAgo = new Date(nowLocal);
+        sixDaysAgo.setDate(nowLocal.getDate() - 6);
+        const startOfWeek = new Date(sixDaysAgo.getFullYear(), sixDaysAgo.getMonth(), sixDaysAgo.getDate()).toISOString().slice(0, 10);
+
+        const startOfMonth = new Date(nowLocal.getFullYear(), nowLocal.getMonth(), 1).toISOString().slice(0, 10);
+
+        // Actividades: campo 'fecha'
         const FILTROS_ACT = {
-            dia: `fecha >= '${startOfDay}' AND fecha < '${startOfTomorrow}'`,
-            semana: `fecha >= '${startOfWeek}'`,
-            mes: `fecha >= '${startOfMonth}'`,
+            dia: `fecha >= '${startOfDay} 00:00:00' AND fecha <= '${startOfDay} 23:59:59'`,
+            semana: `fecha >= '${startOfWeek} 00:00:00'`,
+            mes: `fecha >= '${startOfMonth} 00:00:00'`,
             total: null
         };
         // Prospectos nuevos: campo 'fechaRegistro'
         const FILTROS_CLI = {
-            dia: `fechaRegistro >= '${startOfDay}' AND fechaRegistro < '${startOfTomorrow}'`,
-            semana: `fechaRegistro >= '${startOfWeek}'`,
-            mes: `fechaRegistro >= '${startOfMonth}'`,
+            dia: `(fechaRegistro >= '${startOfDay} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfDay} 00:00:00'))`,
+            semana: `(fechaRegistro >= '${startOfWeek} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfWeek} 00:00:00'))`,
+            mes: `(fechaRegistro >= '${startOfMonth} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfMonth} 00:00:00'))`,
             total: null
         };
         // Reuniones agendadas: campo 'fecha' (en tabla actividades)
         const FILTROS_REUNION = {
-            dia: `fecha >= '${startOfDay}' AND fecha < '${startOfTomorrow}'`,
-            semana: `fecha >= '${startOfWeek}'`,
-            mes: `fecha >= '${startOfMonth}'`,
+            dia: `fecha >= '${startOfDay} 00:00:00' AND fecha <= '${startOfDay} 23:59:59'`,
+            semana: `fecha >= '${startOfWeek} 00:00:00'`,
+            mes: `fecha >= '${startOfMonth} 00:00:00'`,
             total: null
         };
 
@@ -248,8 +253,8 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
         const now = new Date().toISOString();
 
         const stmt = await db.prepare(`
-            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo, fechaRegistro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo', ?)
+            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
         `);
         const result = await stmt.run(
             nombres.trim(),
@@ -261,8 +266,7 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
             (notas || '').trim(),
             prospectorId,
             prospectorId,
-            closerId,
-            now
+            closerId
         );
 
         const row = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(result.lastInsertRowid);

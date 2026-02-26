@@ -33,41 +33,6 @@ const convertSql = (sql) => {
   return sql.replace(/\?/g, () => `$${count++}`);
 };
 
-// Helper para normalizar nombres de columnas de Postgres (minúsculas) a camelCase para la app
-const normalizeRow = (row) => {
-  if (!row || !isPostgres) return row;
-  const mapping = {
-    etapaembudo: 'etapaEmbudo',
-    proximallamada: 'proximaLlamada',
-    prospectorasignado: 'prospectorAsignado',
-    closerasignado: 'closerAsignado',
-    fechatransferencia: 'fechaTransferencia',
-    fechaultimaetapa: 'fechaUltimaEtapa',
-    historialembudo: 'historialEmbudo',
-    vendedorasignado: 'vendedorAsignado',
-    fecharegistro: 'fechaRegistro',
-    ultimainteraccion: 'ultimaInteraccion',
-    apellidopaterno: 'apellidoPaterno',
-    apellidomaterno: 'apellidoMaterno',
-    apellido_paterno: 'apellidoPaterno', // Fallback
-    apellido_materno: 'apellidoMaterno',
-    googlerefreshtoken: 'googleRefreshToken',
-    googleaccesstoken: 'googleAccessToken',
-    googletokenexpiry: 'googleTokenExpiry',
-    fechacreacion: 'fechaCreacion',
-    cambioetapa: 'cambioEtapa',
-    etapaanterior: 'etapaAnterior',
-    etapanueva: 'etapaNueva',
-    fechalimite: 'fechaLimite'
-  };
-  const normalized = {};
-  for (const key in row) {
-    const targetKey = mapping[key] || key;
-    normalized[targetKey] = row[key];
-  }
-  return normalized;
-};
-
 // Shim para imitar better-sqlite3 de forma asíncrona
 const db = {
   pragma: (sql) => {
@@ -80,7 +45,7 @@ const db = {
       get: async (...params) => {
         if (isPostgres) {
           const res = await internalDb.query(finalSql, params);
-          return normalizeRow(res.rows[0]);
+          return res.rows[0];
         } else {
           return internalDb.prepare(sql).get(...params);
         }
@@ -88,7 +53,7 @@ const db = {
       all: async (...params) => {
         if (isPostgres) {
           const res = await internalDb.query(finalSql, params);
-          return res.rows.map(normalizeRow);
+          return res.rows;
         } else {
           return internalDb.prepare(sql).all(...params);
         }

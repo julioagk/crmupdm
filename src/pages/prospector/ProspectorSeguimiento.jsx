@@ -677,9 +677,28 @@ const ProspectorSeguimiento = () => {
 
         const registrarActividad = async (payload) => {
             try {
-                await axios.post(`${API_URL}/api/${rolePath}/registrar-actividad`, { clienteId: pid, ...payload }, { headers: getAuthHeaders() });
+                // Promover etapa automáticamente si corresponde
+                const payloadFinal = { ...payload };
+                if (
+                    payload.tipo === 'llamada' &&
+                    payload.resultado === 'exitoso' &&
+                    prospectoSeleccionado.etapaEmbudo === 'prospecto_nuevo'
+                ) {
+                    payloadFinal.etapaEmbudo = 'en_contacto';
+                }
+
+                await axios.post(`${API_URL}/api/${rolePath}/registrar-actividad`, { clienteId: pid, ...payloadFinal }, { headers: getAuthHeaders() });
                 toast.success('Interacción registrada');
-                handleSeleccionarProspecto(prospectoSeleccionado);
+
+                // Recargar prospecto fresco desde el servidor (evitar estado obsoleto)
+                const res = await axios.get(`${API_URL}/api/${rolePath}/prospectos`, { headers: getAuthHeaders() });
+                const updated = res.data.find(p => p.id === pid || p._id === pid);
+                if (updated) {
+                    setProspectoSeleccionado(updated);
+                    setProspectos(res.data);
+                }
+                // Recargar historial
+                handleSeleccionarProspecto(updated || prospectoSeleccionado);
             } catch { toast.error('Error al registrar'); }
         };
 
