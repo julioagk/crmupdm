@@ -343,98 +343,53 @@ router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
     }
 });
 
-// ... (registrar-actividad se mantiene igual ya que es compatible) ...
-
-// GET /api/closer/prospecto/:id/historial-completo
-// NUEVO: Historial COMPLETO para closer y prospector
-router.get('/prospecto/:id/historial-completo', auth, async (req, res) => {
+// POST /api/closer/registrar-actividad
+router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
     try {
-        const prospectoId = parseInt(req.params.id);
-        const usuarioId = parseInt(req.usuario.id);
+        const { clienteId, tipo, resultado, descripcion, notas, fechaCita } = req.body;
+        const tiposValidos = ['llamada', 'mensaje', 'correo', 'whatsapp', 'cita', 'cliente', 'descartado'];
+        const resultadosValidos = ['exitoso', 'pendiente', 'fallido', 'convertido', 'descartado', 'enviado'];
 
-        // Obtener cliente
-        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
-        if (!cliente) {
-            return res.status(404).json({ msg: 'Prospecto no encontrado' });
+        if (!clienteId || !tipo) {
+            return res.status(400).json({ msg: 'Cliente y tipo de actividad son requeridos' });
+        }
+        if (!tiposValidos.includes(tipo)) {
+            return res.status(400).json({ msg: 'Tipo de actividad no válido' });
         }
 
-        // UNIFICADO: Acceso compartido para cualquier prospector o closer
+        const cid = parseInt(clienteId);
+        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
+        if (!cliente) {
+            return res.status(404).json({ msg: 'Cliente no encontrado' });
+        }
+        const closerId = parseInt(req.usuario.id);
+
+        // UNIFICADO: Acceso compartido por rol
         const rolesPermitidos = ['prospector', 'closer'];
         if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
-            return res.status(403).json({ msg: 'No tienes permiso para ver este historial' });
+            return res.status(403).json({ msg: 'No tienes permiso para registrar actividades' });
         }
 
-        // Obtener TODAS las actividades del cliente (de prospector Y closer)
-        const actividades = await db.prepare(`
-            SELECT a.*, u.nombre as vendedorNombre, u.rol as vendedorRol
-            FROM actividades a
-            LEFT JOIN usuarios u ON a.vendedor = u.id
-            WHERE a.cliente = ?
-            ORDER BY a.fecha ASC
-        `).all(prospectoId);
+        console.log(`✅ Registro de actividad por ${req.usuario.nombre} (${req.usuario.rol}) para cliente ${cid}`);
 
-        // Obtener historial del embudo
-        const historialEmbudo = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
+        const resultadoFinal = resultado && resultadosValidos.includes(resultado) ? resultado : 'pendiente';
+        const fechaActividad = tipo === 'cita' && fechaCita ? new Date(fechaCita).toISOString() : new Date().toISOString();
 
-        // Construir timeline completo
-        const timeline = [];
+        const ins = await db.prepare(`
+            INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(tipo, closerId, cid, fechaActividad, descripcion || `${tipo} registrada`, resultadoFinal, notas || '');
 
-        // Agregar cambios de etapa (FILTRAR los redundantes con actividades de cita)
-        // Las etapas de reunion_agendada y reunion_realizada ya se muestran como actividades tipo 'cita'
-        const etapasRelacionadasConCitas = ['reunion_agendada', 'reunion_realizada'];
+        const now = new Date().toISOString();
+        await db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, cid);
 
-        historialEmbudo.forEach(h => {
-            // Solo agregar cambios de etapa que NO sean redundantes con actividades de cita
-            const esRedundante = etapasRelacionadasConCitas.includes(h.etapa) &&
-                actividades.some(a => a.tipo === 'cita' &&
-                    Math.abs(new Date(a.fecha) - new Date(h.fecha)) < 60000); // 1 minuto tolerancia
+        const actRow = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(ins.lastInsertRowid);
+        const actividad = toMongoFormat(actRow);
+        if (actividad) actividad.cliente = { nombres: cliente.nombres, apellidoPaterno: cliente.apellidoPaterno, empresa: cliente.empresa };
 
-            if (!esRedundante) {
-                timeline.push({
-                    tipo: 'cambio_etapa',
-                    etapa: h.etapa,
-                    fecha: h.fecha,
-                    vendedorId: h.vendedor,
-                    descripcion: h.descripcion || `Cambio a etapa: ${h.etapa}`,
-                    resultado: h.resultado || null
-                });
-            }
-        });
-
-        // Agregar actividades
-        actividades.forEach(a => {
-            const mongoAct = toMongoFormat(a);
-            timeline.push({
-                tipo: 'actividad',
-                id: mongoAct?.id || a.id,
-                tipoActividad: a.tipo,
-                fecha: a.fecha,
-                vendedorId: a.vendedor,
-                vendedorNombre: a.vendedorNombre || 'Desconocido',
-                vendedorRol: a.vendedorRol || 'vendedor',
-                descripcion: a.descripcion,
-                resultado: a.resultado,
-                notas: a.notas
-            });
-        });
-
-        // Ordenar por fecha
-        timeline.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-
-        res.json({
-            cliente: toMongoFormat(cliente) || cliente,
-            timeline,
-            resumen: {
-                totalActividades: actividades.length,
-                etapaActual: cliente.etapaEmbudo,
-                ultimaInteraccion: cliente.ultimaInteraccion,
-                prospectorAsignado: cliente.prospectorAsignado,
-                closerAsignado: cliente.closerAsignado,
-                vendedoresInvolucrados: [...new Set(actividades.map(a => a.vendedorNombre).filter(Boolean))]
-            }
-        });
+        res.status(201).json({ msg: 'Actividad registrada', actividad: actividad || actRow });
     } catch (error) {
-        console.error('Error al obtener historial completo:', error);
+        console.error('Error al registrar actividad:', error);
         res.status(500).json({ msg: 'Error del servidor' });
     }
 });
@@ -443,11 +398,15 @@ router.get('/prospecto/:id/historial-completo', auth, async (req, res) => {
 router.get('/prospectos/:id/actividades', auth, async (req, res) => {
     try {
         const prospectoId = parseInt(req.params.id);
-        const closerId = parseInt(req.usuario.id);
 
-        const cliente = await db.prepare('SELECT id, closerAsignado FROM clientes WHERE id = ?').get(prospectoId);
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No autorizado' });
+        }
+
+        const cliente = await db.prepare('SELECT id FROM clientes WHERE id = ?').get(prospectoId);
         if (!cliente) return res.status(404).json({ msg: 'Prospecto no encontrado' });
-        if (cliente.closerAsignado !== closerId) return res.status(403).json({ msg: 'No tienes permiso' });
 
         const acts = await db.prepare('SELECT a.*, u.nombre as vendedorNombre FROM actividades a LEFT JOIN usuarios u ON a.vendedor = u.id WHERE a.cliente = ? ORDER BY a.fecha DESC').all(prospectoId);
         const actividades = acts.map(a => {
@@ -474,7 +433,13 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
         const cid = parseInt(clienteId);
         const closerId = parseInt(req.usuario.id);
         const c = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
-        if (!c || c.closerAsignado !== closerId) return res.status(403).json({ msg: 'No autorizado' });
+        if (!c) return res.status(404).json({ msg: 'Cliente no encontrado' });
+
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No autorizado' });
+        }
 
         // Mapa de resultado → etapa del embudo
         const etapaMap = {
@@ -529,16 +494,20 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
 router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
     try {
         const prospectoId = parseInt(req.params.id);
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, ubicacion, notas } = req.body;
-        const closerId = parseInt(req.usuario.id);
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas } = req.body;
 
         if (!nombres || !telefono) {
             return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
         }
 
-        const cliente = await db.prepare('SELECT id, closerAsignado FROM clientes WHERE id = ?').get(prospectoId);
+        const cliente = await db.prepare('SELECT id FROM clientes WHERE id = ?').get(prospectoId);
         if (!cliente) return res.status(404).json({ msg: 'Prospecto no encontrado' });
-        if (cliente.closerAsignado !== closerId) return res.status(403).json({ msg: 'No tienes permiso para editar este prospecto' });
+
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No tienes permiso para editar' });
+        }
 
         await db.prepare(`
             UPDATE clientes 
@@ -574,8 +543,10 @@ router.post('/pasar-a-cliente/:id', [auth, esCloser], async (req, res) => {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
 
-        if (cliente.closerAsignado !== closerId) {
-            return res.status(403).json({ msg: 'No tienes permiso para modificar este prospecto' });
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No tienes permiso' });
         }
 
         const now = new Date().toISOString();
@@ -612,8 +583,10 @@ router.post('/descartar-prospecto/:id', [auth, esCloser], async (req, res) => {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
 
-        if (cliente.closerAsignado !== closerId) {
-            return res.status(403).json({ msg: 'No tienes permiso para modificar este prospecto' });
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No tienes permiso' });
         }
 
         const now = new Date().toISOString();

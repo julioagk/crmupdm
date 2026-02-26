@@ -520,7 +520,12 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
 
         const cliente = await db.prepare('SELECT id, prospectorAsignado FROM clientes WHERE id = ?').get(prospectoId);
         if (!cliente) return res.status(404).json({ msg: 'Prospecto no encontrado' });
-        if (cliente.prospectorAsignado !== prospectorId) return res.status(403).json({ msg: 'No tienes permiso para editar este prospecto' });
+
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No tienes permiso para editar' });
+        }
 
         await db.prepare(`
             UPDATE clientes 
@@ -562,8 +567,11 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
         }
 
         const prospectorId = parseInt(req.usuario.id);
-        if (cliente.prospectorAsignado !== prospectorId) {
-            return res.status(403).json({ msg: 'No tienes permiso para agendar reunión con este cliente' });
+
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No tienes permiso para agendar reunión' });
         }
 
         const now = new Date().toISOString();
@@ -719,7 +727,9 @@ router.post('/pasar-a-cliente/:id', [auth, esProspector], async (req, res) => {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
 
-        if (cliente.prospectorAsignado !== prospectorId) {
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
             return res.status(403).json({ msg: 'No tienes permiso para modificar este prospecto' });
         }
 
@@ -757,7 +767,9 @@ router.post('/descartar-prospecto/:id', [auth, esProspector], async (req, res) =
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
 
-        if (cliente.prospectorAsignado !== prospectorId) {
+        // UNIFICADO: Acceso por rol
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
             return res.status(403).json({ msg: 'No tienes permiso para modificar este prospecto' });
         }
 
