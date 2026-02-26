@@ -562,6 +562,11 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
         }
 
+        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
+        if (!cliente) {
+            return res.status(404).json({ msg: 'Prospecto no encontrado' });
+        }
+
         const updates = [
             'nombres = ?', 'apellidoPaterno = ?', 'apellidoMaterno = ?',
             'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?',

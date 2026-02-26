@@ -101,7 +101,9 @@ const ProspectorSeguimiento = () => {
             telefono: p.telefono || '',
             correo: p.correo || '',
             empresa: p.empresa || '',
-            notas: p.notas || ''
+            notas: p.notas || '',
+            etapaEmbudo: p.etapaEmbudo || 'prospecto_nuevo',
+            proximaLlamada: p.proximaLlamada ? p.proximaLlamada.slice(0, 16) : ''
         });
         setModalEditarAbierto(true);
     };
@@ -263,7 +265,7 @@ const ProspectorSeguimiento = () => {
             // MEJORADO: Usar endpoint de historial completo para ver actividades de AMBOS (prospector y closer)
             const endpoint = `${API_URL}/api/${rolePath}/prospecto/${p.id || p._id}/historial-completo`;
             const res = await axios.get(endpoint, { headers: getAuthHeaders() });
-            
+
             // Si la respuesta incluye timeline completo, extractar actividades
             if (res.data.timeline) {
                 // Filtrar solo actividades (no cambios de etapa)
@@ -465,6 +467,27 @@ const ProspectorSeguimiento = () => {
                                         type="text"
                                         value={prospectoAEditar.empresa}
                                         onChange={(e) => setProspectoAEditar((f) => ({ ...f, empresa: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Etapa del Embudo</label>
+                                    <select
+                                        value={prospectoAEditar.etapaEmbudo}
+                                        onChange={(e) => setProspectoAEditar((f) => ({ ...f, etapaEmbudo: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm bg-white"
+                                    >
+                                        {Object.entries(ETAPAS_EMBUDO).map(([key, value]) => (
+                                            <option key={key} value={key}>{value.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Recordatorio (Próxima Llamada)</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={prospectoAEditar.proximaLlamada || ''}
+                                        onChange={(e) => setProspectoAEditar((f) => ({ ...f, proximaLlamada: e.target.value }))}
                                         className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
                                     />
                                 </div>
