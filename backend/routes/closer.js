@@ -350,7 +350,7 @@ router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
 // POST /api/closer/registrar-actividad
 router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
     try {
-        const { clienteId, tipo, resultado, descripcion, notas, fechaCita } = req.body;
+        const { clienteId, tipo, resultado, descripcion, notas, fechaCita, etapaEmbudo, proximaLlamada, interes } = req.body;
         const tiposValidos = ['llamada', 'mensaje', 'correo', 'whatsapp', 'cita', 'cliente', 'descartado'];
         const resultadosValidos = ['exitoso', 'pendiente', 'fallido', 'convertido', 'descartado', 'enviado'];
 
@@ -368,7 +368,6 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
         }
         const closerId = parseInt(req.usuario.id);
 
-        // UNIFICADO: Acceso compartido por rol
         const rolesPermitidos = ['prospector', 'closer'];
         if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
             return res.status(403).json({ msg: 'No tienes permiso para registrar actividades' });
@@ -385,7 +384,45 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
         `).run(tipo, closerId, cid, fechaActividad, descripcion || `${tipo} registrada`, resultadoFinal, notas || '');
 
         const now = new Date().toISOString();
-        await db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, cid);
+        const updates = ['ultimaInteraccion = ?'];
+        const params = [now];
+
+        // Actualizar proximaLlamada si se proporcionó
+        if (proximaLlamada !== undefined) {
+            updates.push('proximaLlamada = ?');
+            params.push(proximaLlamada);
+        }
+
+        // Actualizar interés si se proporcionó
+        if (interes !== undefined) {
+            updates.push('interes = ?');
+            params.push(parseInt(interes));
+        }
+
+        // Cambio de etapa: auto-promoción o explícito
+        let nuevaEtapa = (tipo === 'llamada' && resultadoFinal === 'exitoso' && cliente.etapaEmbudo === 'prospecto_nuevo')
+            ? 'en_contacto'
+            : etapaEmbudo;
+
+        if (nuevaEtapa && nuevaEtapa !== cliente.etapaEmbudo) {
+            updates.push('etapaEmbudo = ?');
+            params.push(nuevaEtapa);
+            updates.push('fechaUltimaEtapa = ?');
+            params.push(now);
+
+            const hist = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
+            hist.push({
+                etapa: nuevaEtapa,
+                fecha: now,
+                vendedor: closerId,
+                descripcion: `Actividad (${tipo}): Cambio a ${nuevaEtapa}`
+            });
+            updates.push('historialEmbudo = ?');
+            params.push(JSON.stringify(hist));
+        }
+
+        params.push(cid);
+        await db.prepare(`UPDATE clientes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
         const actRow = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(ins.lastInsertRowid);
         const actividad = toMongoFormat(actRow);
@@ -397,6 +434,31 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
         res.status(500).json({ msg: 'Error del servidor' });
     }
 });
+
+// PUT /api/closer/prospectos/:id  — actualización simple (interés, próxima llamada)
+router.put('/prospectos/:id', auth, async (req, res) => {
+    try {
+        const prospectoId = parseInt(req.params.id);
+        const { interes, proximaLlamada } = req.body;
+
+        const updates = [];
+        const params = [];
+
+        if (interes !== undefined) { updates.push('interes = ?'); params.push(interes); }
+        if (proximaLlamada !== undefined) { updates.push('proximaLlamada = ?'); params.push(proximaLlamada); }
+
+        if (updates.length > 0) {
+            params.push(prospectoId);
+            await db.prepare(`UPDATE clientes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        }
+
+        res.json({ msg: 'Prospecto actualizado' });
+    } catch (error) {
+        console.error('Error al actualizar prospecto:', error);
+        res.status(500).json({ msg: 'Error del servidor' });
+    }
+});
+
 
 // GET /api/closer/prospecto/:id/historial-completo
 // REUTILIZADO: Historial COMPLETO visible para prospector o closer
