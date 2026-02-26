@@ -172,8 +172,18 @@ router.get('/events', auth, async (req, res) => {
         const { timeMin, timeMax } = req.query;
         if (!timeMin || !timeMax) return res.status(400).json({ msg: 'Faltan parámetros timeMin o timeMax' });
 
+        // Validar formato de fecha (Google requiere RFC3339)
+        try {
+            new Date(timeMin).toISOString();
+            new Date(timeMax).toISOString();
+        } catch (e) {
+            return res.status(400).json({ msg: 'Formato de fecha inválido' });
+        }
+
         const { google } = require('googleapis');
         const calendar = google.calendar({ version: 'v3', auth: client });
+
+        console.log(`📅 Consultando eventos de Google para usuario ${userId} entre ${timeMin} y ${timeMax}`);
 
         const response = await calendar.events.list({
             calendarId: 'primary',
@@ -187,8 +197,13 @@ router.get('/events', auth, async (req, res) => {
         res.json(response.data.items || []);
 
     } catch (error) {
-        console.error('Error fetching events:', error);
-        res.status(500).json({ msg: 'Error al consultar eventos', error: error.message });
+        console.error('❌ Error fetching Google events:', error.response ? error.response.data : error.message);
+        const status = error.code || 500;
+        res.status(status === 401 ? 401 : 500).json({
+            msg: 'Error al consultar eventos',
+            error: error.message,
+            details: error.response ? error.response.data : null
+        });
     }
 });
 

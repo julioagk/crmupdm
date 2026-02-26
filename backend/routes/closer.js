@@ -398,6 +398,99 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
     }
 });
 
+// GET /api/closer/prospecto/:id/historial-completo
+// REUTILIZADO: Historial COMPLETO visible para prospector o closer
+router.get('/prospecto/:id/historial-completo', auth, async (req, res) => {
+    try {
+        const prospectoId = parseInt(req.params.id);
+        const usuarioId = parseInt(req.usuario.id);
+
+        console.log(`🔍 [Closer] Consultando historial de prospecto ${prospectoId} por usuario ${usuarioId} (${req.usuario.rol})`);
+
+        // Obtener cliente
+        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
+        if (!cliente) {
+            return res.status(404).json({ msg: 'Prospecto no encontrado' });
+        }
+
+        // UNIFICADO: Cualquier prospector o closer puede ver el historial (acceso compartido)
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            return res.status(403).json({ msg: 'No tienes permisos de rol para ver esto' });
+        }
+
+        // Obtener TODAS las actividades del cliente (de todos los vendedores que han trabajado en él)
+        const actividades = await db.prepare(`
+            SELECT a.*, u.nombre as vendedorNombre, u.rol as vendedorRol
+            FROM actividades a
+            LEFT JOIN usuarios u ON a.vendedor = u.id
+            WHERE a.cliente = ?
+            ORDER BY a.fecha ASC
+        `).all(prospectoId);
+
+        // Obtener historial del embudo
+        const historialEmbudo = cliente.historialEmbudo ? JSON.parse(cliente.historialEmbudo) : [];
+
+        // Construir respuesta enriquecida
+        const timeline = [];
+
+        // Agregar cambios de etapa (FILTRAR los redundantes con actividades de cita)
+        const etapasRelacionadasConCitas = ['reunion_agendada', 'reunion_realizada'];
+
+        historialEmbudo.forEach(h => {
+            const esRedundante = etapasRelacionadasConCitas.includes(h.etapa) &&
+                actividades.some(a => a.tipo === 'cita' &&
+                    Math.abs(new Date(a.fecha) - new Date(h.fecha)) < 60000);
+
+            if (!esRedundante) {
+                timeline.push({
+                    tipo: 'cambio_etapa',
+                    etapa: h.etapa,
+                    fecha: h.fecha,
+                    vendedorId: h.vendedor,
+                    descripcion: h.descripcion || `Cambio a etapa: ${h.etapa}`,
+                    resultado: h.resultado || null
+                });
+            }
+        });
+
+        // Agregar actividades
+        actividades.forEach(a => {
+            const mongoAct = toMongoFormat(a);
+            timeline.push({
+                tipo: 'actividad',
+                id: mongoAct?.id || a.id,
+                tipoActividad: a.tipo,
+                fecha: a.fecha,
+                vendedorId: a.vendedor,
+                vendedorNombre: a.vendedorNombre || 'Desconocido',
+                vendedorRol: a.vendedorRol || 'vendedor',
+                descripcion: a.descripcion,
+                resultado: a.resultado,
+                notas: a.notas
+            });
+        });
+
+        // Ordenar por fecha
+        timeline.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+        res.json({
+            cliente: toMongoFormat(cliente) || cliente,
+            timeline,
+            resumen: {
+                totalActividades: actividades.length,
+                etapaActual: cliente.etapaEmbudo,
+                ultimaInteraccion: cliente.ultimaInteraccion,
+                prospectorAsignado: cliente.prospectorAsignado,
+                closerAsignado: cliente.closerAsignado
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener historial completo:', error);
+        res.status(500).json({ msg: 'Error del servidor', error: error.message });
+    }
+});
+
 // GET /api/closer/prospectos/:id/actividades
 router.get('/prospectos/:id/actividades', auth, async (req, res) => {
     try {
