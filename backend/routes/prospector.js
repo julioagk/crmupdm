@@ -294,14 +294,14 @@ router.post('/registrar-actividad', [auth, esProspector], async (req, res) => {
         }
         const prospectorId = parseInt(req.usuario.id);
 
-        // MEJORADO: Permitir que prospector registre actividades ANTES y DURANTE la transferencia
-        // Si es prospector, debe estar asignado. Si es closer, puede registrar en clientes asignados a él
-        const esProspectorAsignado = cliente.prospectorAsignado === prospectorId && String(req.usuario.rol).toLowerCase() === 'prospector';
-        const esCloserDelCliente = cliente.closerAsignado === prospectorId && String(req.usuario.rol).toLowerCase() === 'closer';
-
-        if (!esProspectorAsignado && !esCloserDelCliente) {
-            return res.status(403).json({ msg: 'No tienes permiso para registrar actividades de este cliente' });
+        // UNIFICADO: Cualquier prospector o closer puede registrar actividades (acceso compartido)
+        const rolesPermitidos = ['prospector', 'closer'];
+        if (!rolesPermitidos.includes(String(req.usuario.rol).toLowerCase())) {
+            console.log(`🚫 Bloqueado registro de actividad por rol: ${req.usuario.rol}`);
+            return res.status(403).json({ msg: 'No tienes permisos de rol para registrar actividades' });
         }
+
+        console.log(`✅ Usuario ${prospectorId} (${req.usuario.rol}) registrando actividad para cliente ${cid}`);
 
         const resultadoFinal = resultado && resultadosValidos.includes(resultado) ? resultado : 'pendiente';
         const fechaActividad = tipo === 'cita' && fechaCita ? new Date(fechaCita).toISOString() : new Date().toISOString();
