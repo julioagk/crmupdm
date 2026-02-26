@@ -54,7 +54,11 @@ const normalizeRow = (row) => {
     googlerefreshtoken: 'googleRefreshToken',
     googleaccesstoken: 'googleAccessToken',
     googletokenexpiry: 'googleTokenExpiry',
-    fechacreacion: 'fechaCreacion'
+    fechacreacion: 'fechaCreacion',
+    cambioetapa: 'cambioEtapa',
+    etapaanterior: 'etapaAnterior',
+    etapanueva: 'etapaNueva',
+    fechalimite: 'fechaLimite'
   };
   const normalized = {};
   for (const key in row) {
