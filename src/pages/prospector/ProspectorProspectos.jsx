@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
+import {
   Users, Search, Plus, Phone, MessageSquare, Mail, Calendar,
   ChevronRight, Tag, Clock, Building, Star, RefreshCcw, UserPlus,
-  Download, Upload, X, CheckCircle, AlertCircle, FileText
+  Download, Upload, X, CheckCircle, AlertCircle, FileText, Trash2
 } from 'lucide-react';
 import axios from '../../lib/axios';
 import { toast } from 'react-hot-toast';
@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const CSV_HEADERS = ['nombres', 'apellidoPaterno', 'apellidoMaterno', 'telefono', 'correo', 'empresa', 'notas'];
-const CSV_LABELS  = ['Nombres', 'Apellido Paterno', 'Apellido Materno', 'Telefono', 'Correo', 'Empresa', 'Notas'];
+const CSV_LABELS = ['Nombres', 'Apellido Paterno', 'Apellido Materno', 'Telefono', 'Correo', 'Empresa', 'Notas'];
 
 function prospectosToCsv(prospectos) {
   const escape = (val) => {
@@ -109,6 +109,8 @@ const ProspectorProspectos = () => {
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
+  const [prospectoAEliminar, setProspectoAEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const fetchProspectos = useCallback(async () => {
     try {
@@ -175,6 +177,21 @@ const ProspectorProspectos = () => {
     setImportResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setIsImportModalAbierto(false);
+  };
+
+  const handleEliminarProspecto = async () => {
+    if (!prospectoAEliminar) return;
+    try {
+      setEliminando(true);
+      await axios.delete(`/api/prospector/prospectos/${prospectoAEliminar.id}`);
+      toast.success('Prospecto eliminado correctamente');
+      setProspectoAEliminar(null);
+      fetchProspectos();
+    } catch (error) {
+      toast.error(error.response?.data?.msg || 'Error al eliminar el prospecto');
+    } finally {
+      setEliminando(false);
+    }
   };
 
   const handleCrearProspecto = async (e) => {
@@ -246,7 +263,7 @@ const ProspectorProspectos = () => {
               </div>
               <div className="flex items-center gap-3 w-full lg:w-auto">
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 shrink-0">
-                  {[{key:'todos',label:'Todos'},{key:'prospecto_nuevo',label:'Nuevos'},{key:'en_contacto',label:'En Contacto'},{key:'reunion_agendada',label:'Agendados'}].map(f => (
+                  {[{ key: 'todos', label: 'Todos' }, { key: 'prospecto_nuevo', label: 'Nuevos' }, { key: 'en_contacto', label: 'En Contacto' }, { key: 'reunion_agendada', label: 'Agendados' }].map(f => (
                     <button key={f.key} onClick={() => setFiltroEtapa(f.key)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filtroEtapa === f.key ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{f.label}</button>
                   ))}
                 </div>
@@ -269,7 +286,7 @@ const ProspectorProspectos = () => {
                   <div key={prospecto.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group overflow-hidden">
                     <div className="p-5 border-b border-slate-100">
                       <div className="flex justify-between items-start mb-2">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getEtapaColor(prospecto.etapaEmbudo)}`}>{(prospecto.etapaEmbudo || 'prospecto_nuevo').replace('_',' ').toUpperCase()}</span>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getEtapaColor(prospecto.etapaEmbudo)}`}>{(prospecto.etapaEmbudo || 'prospecto_nuevo').replace('_', ' ').toUpperCase()}</span>
                         <div className="flex items-center gap-1 text-yellow-500"><Star className={`w-4 h-4 ${prospecto.interes >= 3 ? 'fill-current' : ''}`} /><span className="text-sm font-bold text-slate-700">{prospecto.interes || 0}</span></div>
                       </div>
                       <h3 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{prospecto.nombres} {prospecto.apellidoPaterno}</h3>
@@ -281,10 +298,13 @@ const ProspectorProspectos = () => {
                       <div className="flex items-center gap-3 text-slate-500 pt-2 border-t border-slate-100 italic text-xs"><Clock className="w-4 h-4" /><span>Actualizado: {formatearFecha(prospecto.updated_at || prospecto.fechaUltimaEtapa)}</span></div>
                     </div>
                     <div className="px-5 py-4 flex items-center justify-between bg-white">
-                      <div className="flex -space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center" title="Llamada"><Phone className="w-3.5 h-3.5 text-slate-400" /></div>
-                        <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center" title="WhatsApp"><MessageSquare className="w-3.5 h-3.5 text-slate-400" /></div>
-                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setProspectoAEliminar(prospecto); }}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        title="Eliminar prospecto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                       <a href={`/prospector/prospecto/${prospecto.id}`} className="flex items-center gap-2 text-indigo-600 font-bold text-sm hover:underline">Gestionar<ChevronRight className="w-4 h-4" /></a>
                     </div>
                   </div>
@@ -299,6 +319,37 @@ const ProspectorProspectos = () => {
             </div>
           </div>
         </main>
+
+        {/* Modal de confirmación para eliminar */}
+        <Modal isOpen={!!prospectoAEliminar} onClose={() => setProspectoAEliminar(null)} title="Eliminar Prospecto">
+          <div className="space-y-4">
+            <div className="flex items-start gap-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <AlertCircle className="w-6 h-6 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-800">¿Estás seguro de eliminar este prospecto?</p>
+                <p className="text-red-700 text-sm mt-1">
+                  Se eliminará permanentemente a <strong>{prospectoAEliminar?.nombres} {prospectoAEliminar?.apellidoPaterno}</strong> y todo su historial de actividades. Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setProspectoAEliminar(null)}
+                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminarProspecto}
+                disabled={eliminando}
+                className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-md disabled:opacity-50 flex items-center gap-2 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </Modal>
 
         <Modal isOpen={isModalAbierto} onClose={() => setIsModalAbierto(false)} title="Agregar Nuevo Prospecto">
           <form onSubmit={handleCrearProspecto} className="space-y-4">
@@ -351,7 +402,7 @@ const ProspectorProspectos = () => {
                 {csvPreview.data.length > 0 && (
                   <div className="overflow-x-auto rounded-xl border border-slate-200 max-h-48">
                     <table className="w-full text-xs">
-                      <thead className="bg-slate-50"><tr>{['Nombres','Telefono','Empresa','Correo'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600">{h}</th>)}</tr></thead>
+                      <thead className="bg-slate-50"><tr>{['Nombres', 'Telefono', 'Empresa', 'Correo'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600">{h}</th>)}</tr></thead>
                       <tbody>
                         {csvPreview.data.slice(0, 10).map((row, i) => (
                           <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">

@@ -1060,4 +1060,32 @@ router.post('/importar-csv', [auth, esProspector], async (req, res) => {
     }
 });
 
+// DELETE /api/prospector/prospectos/:id
+router.delete('/prospectos/:id', [auth, esProspector], async (req, res) => {
+    try {
+        const prospectoId = parseInt(req.params.id);
+        const prospectorId = parseInt(req.usuario.id);
+
+        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
+        if (!cliente) {
+            return res.status(404).json({ msg: 'Prospecto no encontrado' });
+        }
+
+        // Solo el prospector asignado puede eliminar
+        if (parseInt(cliente.prospectorAsignado) !== prospectorId) {
+            return res.status(403).json({ msg: 'No tienes permiso para eliminar este prospecto' });
+        }
+
+        // Eliminar actividades asociadas primero (integridad referencial)
+        await db.prepare('DELETE FROM actividades WHERE cliente = ?').run(prospectoId);
+        // Eliminar el prospecto
+        await db.prepare('DELETE FROM clientes WHERE id = ?').run(prospectoId);
+
+        res.json({ msg: 'Prospecto eliminado correctamente' });
+    } catch (error) {
+        console.error('Error al eliminar prospecto:', error);
+        res.status(500).json({ msg: 'Error del servidor' });
+    }
+});
+
 module.exports = router;
