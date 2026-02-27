@@ -26,11 +26,29 @@ if (process.env.DATABASE_URL) {
   internalDb.pragma('journal_mode = WAL');
 }
 
-// Helper para convertir '?' a '$1', '$2', etc. para Postgres
+// Lista de columnas camelCase que Postgres almacena en minúsculas
+const CAMEL_COLS = [
+  'apellidoPaterno', 'apellidoMaterno', 'etapaEmbudo', 'prospectorAsignado',
+  'closerAsignado', 'fechaTransferencia', 'fechaUltimaEtapa', 'historialEmbudo',
+  'vendedorAsignado', 'fechaRegistro', 'ultimaInteraccion', 'proximaLlamada',
+  'cambioEtapa', 'etapaAnterior', 'etapaNueva', 'fechaLimite', 'fechaCreacion',
+  'googleRefreshToken', 'googleAccessToken', 'googleTokenExpiry',
+  'vendedorNombre', 'vendedorRol', 'closerNombre'
+];
+
+// Helper: convierte '?' a '$1', '$2', etc. para Postgres  y  normaliza columnas camelCase a minúsculas
 const convertSql = (sql) => {
   if (!isPostgres) return sql;
   let count = 1;
-  return sql.replace(/\?/g, () => `$${count++}`);
+  let res = sql.replace(/\?/g, () => `$${count++}`);
+  // Postgres guarda los nombres sin comillas en minúsculas; reemplazamos las referencias camelCase
+  CAMEL_COLS.forEach(col => {
+    const lower = col.toLowerCase();
+    // Reemplaza col exacta (word boundary) que NO esté entre comillas simples
+    const reg = new RegExp(`(?<!['"]\\w*)\\b${col}\\b(?!\\w*['"])`, 'g');
+    res = res.replace(reg, lower);
+  });
+  return res;
 };
 
 // Mapa para restaurar camelCase de postgres que devuelve todo en minúsculas
