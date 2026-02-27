@@ -129,23 +129,23 @@ router.get('/dashboard', [auth, esProspector], async (req, res) => {
 
         // Actividades: campo 'fecha'
         const FILTROS_ACT = {
-            dia: `fecha >= '${startOfDay} 00:00:00' AND fecha <= '${startOfDay} 23:59:59'`,
-            semana: `fecha >= '${startOfWeek} 00:00:00'`,
-            mes: `fecha >= '${startOfMonth} 00:00:00'`,
+            dia: `fecha LIKE '${startOfDay}%'`,
+            semana: `fecha >= '${startOfWeek}T00:00:00.000Z'`,
+            mes: `fecha >= '${startOfMonth}T00:00:00.000Z'`,
             total: null
         };
         // Prospectos nuevos: campo 'fechaRegistro'
         const FILTROS_CLI = {
-            dia: `(fechaRegistro >= '${startOfDay} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfDay} 00:00:00'))`,
-            semana: `(fechaRegistro >= '${startOfWeek} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfWeek} 00:00:00'))`,
-            mes: `(fechaRegistro >= '${startOfMonth} 00:00:00' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfMonth} 00:00:00'))`,
+            dia: `(fecharegistro LIKE '${startOfDay}%' OR (fecharegistro IS NULL AND fechaultimaetapa LIKE '${startOfDay}%'))`,
+            semana: `(fecharegistro >= '${startOfWeek}T00:00:00.000Z' OR (fecharegistro IS NULL AND fechaultimaetapa >= '${startOfWeek}T00:00:00.000Z'))`,
+            mes: `(fecharegistro >= '${startOfMonth}T00:00:00.000Z' OR (fecharegistro IS NULL AND fechaultimaetapa >= '${startOfMonth}T00:00:00.000Z'))`,
             total: null
         };
         // Reuniones agendadas: campo 'fecha' (en tabla actividades)
         const FILTROS_REUNION = {
-            dia: `fecha >= '${startOfDay} 00:00:00' AND fecha <= '${startOfDay} 23:59:59'`,
-            semana: `fecha >= '${startOfWeek} 00:00:00'`,
-            mes: `fecha >= '${startOfMonth} 00:00:00'`,
+            dia: `fecha LIKE '${startOfDay}%'`,
+            semana: `fecha >= '${startOfWeek}T00:00:00.000Z'`,
+            mes: `fecha >= '${startOfMonth}T00:00:00.000Z'`,
             total: null
         };
 
