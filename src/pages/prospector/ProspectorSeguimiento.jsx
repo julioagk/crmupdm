@@ -34,8 +34,8 @@ import HistorialInteracciones from '../../components/HistorialInteracciones';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 // --- CSV helpers ---
-const CSV_HEADERS = ['nombres', 'apellidoPaterno', 'apellidoMaterno', 'telefono', 'correo', 'empresa', 'sitioWeb', 'notas'];
-const CSV_LABELS  = ['Nombres', 'Apellido Paterno', 'Apellido Materno', 'Telefono', 'Correo', 'Empresa', 'Sitio Web', 'Notas'];
+const CSV_HEADERS = ['nombres', 'apellidoPaterno', 'apellidoMaterno', 'telefono', 'correo', 'empresa', 'sitioWeb', 'ubicacion', 'notas'];
+const CSV_LABELS  = ['Nombres', 'Apellido Paterno', 'Apellido Materno', 'Telefono', 'Correo', 'Empresa', 'Sitio Web', 'Ubicacion', 'Notas'];
 
 function prospectosToCsv(prospectos) {
     const escape = (val) => {
@@ -136,6 +136,7 @@ const ProspectorSeguimiento = () => {
         correo: '',
         empresa: '',
         sitioWeb: '',
+        ubicacion: '',
         notas: ''
     });
 
@@ -171,6 +172,7 @@ const ProspectorSeguimiento = () => {
             correo: p.correo || '',
             empresa: p.empresa || '',
             sitioWeb: p.sitioWeb || '',
+            ubicacion: p.ubicacion || '',
             notas: p.notas || '',
             etapaEmbudo: p.etapaEmbudo || 'prospecto_nuevo',
             proximaLlamada: p.proximaLlamada ? p.proximaLlamada.slice(0, 16) : ''
@@ -370,7 +372,7 @@ const ProspectorSeguimiento = () => {
             });
             toast.success('Prospecto creado');
             setModalCrearAbierto(false);
-            setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', correo: '', empresa: '', sitioWeb: '', notas: '' });
+            setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
             cargarDatos();
         } catch (error) {
             toast.error(error.response?.data?.msg || 'Error al crear');
@@ -526,7 +528,15 @@ const ProspectorSeguimiento = () => {
                                     />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Notas</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
+                                    <input
+                                        type="text"
+                                        value={formCrear.ubicacion}
+                                        onChange={(e) => setFormCrear((f) => ({ ...f, ubicacion: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                        placeholder="Ciudad, Estado, País"
+                                    />
+                                </div>
                                     <textarea
                                         rows={3}
                                         value={formCrear.notas}
@@ -541,7 +551,7 @@ const ProspectorSeguimiento = () => {
                             <button
                                 onClick={() => {
                                     setModalCrearAbierto(false);
-                                    setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', correo: '', empresa: '', sitioWeb: '', notas: '' });
+                                    setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
                                 }}
                                 className="flex-1 px-3 py-2 border border-slate-200 text-gray-700 rounded text-sm hover:bg-slate-50 font-medium"
                             >
@@ -620,6 +630,16 @@ const ProspectorSeguimiento = () => {
                                         onChange={(e) => setProspectoAEditar((f) => ({ ...f, sitioWeb: e.target.value }))}
                                         className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
                                         placeholder="https://ejemplo.com"
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
+                                    <input
+                                        type="text"
+                                        value={prospectoAEditar.ubicacion || ''}
+                                        onChange={(e) => setProspectoAEditar((f) => ({ ...f, ubicacion: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                        placeholder="Ciudad, Estado, País"
                                     />
                                 </div>
                                 <div className="col-span-2">

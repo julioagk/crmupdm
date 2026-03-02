@@ -170,7 +170,8 @@ const initDb = async () => {
     notas TEXT,
     interes INTEGER DEFAULT 0,
     proximaLlamada TEXT,
-    sitioWeb TEXT
+    sitioWeb TEXT,
+    ubicacion TEXT
   );
 
   CREATE TABLE IF NOT EXISTS actividades (
@@ -250,7 +251,19 @@ const initDb = async () => {
     console.error('⚠️ Migración etapaEmbudo falló (no crítico):', e.message);
   }
 
-  // Migración: agregar columna sitioWeb si no existe
+  // Migración: agregar columna ubicacion si no existe
+  try {
+    if (isPostgres) {
+      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS ubicacion TEXT');
+    } else {
+      internalDb.prepare('ALTER TABLE clientes ADD COLUMN ubicacion TEXT').run();
+    }
+    console.log('✅ Migración ubicacion completada');
+  } catch (e) {
+    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
+      console.error('⚠️ Migración ubicacion falló (no crítico):', e.message);
+    }
+  }
   try {
     if (isPostgres) {
       await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS sitioweb TEXT');

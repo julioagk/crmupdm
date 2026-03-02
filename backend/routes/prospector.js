@@ -244,7 +244,7 @@ router.get('/clientes-ganados', [auth, esProspector], async (req, res) => {
 // POST /api/prospector/crear-prospecto
 router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
     try {
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, sitioWeb } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, sitioWeb, ubicacion } = req.body;
 
         const prospectorId = parseInt(req.usuario.id);
         const rol = String(req.usuario.rol).toLowerCase();
@@ -252,8 +252,8 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
         const now = new Date().toISOString();
 
         const stmt = await db.prepare(`
-            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, sitioWeb, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
+            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, sitioWeb, ubicacion, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
         `);
         const result = await stmt.run(
             (nombres || '').trim(),
@@ -264,6 +264,7 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
             (empresa || '').trim(),
             (notas || '').trim(),
             (sitioWeb || '').trim(),
+            (ubicacion || '').trim(),
             prospectorId,
             prospectorId,
             closerId
@@ -565,7 +566,7 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
 
         const updates = [
             'nombres = ?', 'apellidoPaterno = ?', 'apellidoMaterno = ?',
-            'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?', 'sitioWeb = ?',
+            'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?', 'sitioWeb = ?', 'ubicacion = ?',
             'interes = ?', 'proximaLlamada = ?', 'ultimaInteraccion = ?'
         ];
         const params = [
@@ -577,6 +578,7 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             (empresa || '').trim(),
             (notas || '').trim(),
             (sitioWeb || '').trim(),
+            (ubicacion || '').trim(),
             req.body.interes !== undefined ? req.body.interes : 0,
             req.body.proximaLlamada || null,
             new Date().toISOString() // ultimaInteraccion
