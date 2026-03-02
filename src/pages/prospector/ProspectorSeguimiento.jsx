@@ -537,6 +537,8 @@ const ProspectorSeguimiento = () => {
                                         placeholder="Ciudad, Estado, País"
                                     />
                                 </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Notas</label>
                                     <textarea
                                         rows={3}
                                         value={formCrear.notas}
