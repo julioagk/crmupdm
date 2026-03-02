@@ -44,6 +44,8 @@ const CloserClientes = () => {
         };
 
         fetchClientesGanados();
+        const interval = setInterval(fetchClientesGanados, 10 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     const clientesFiltrados = clientes.filter(c =>

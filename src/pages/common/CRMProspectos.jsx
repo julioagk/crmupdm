@@ -136,6 +136,8 @@ const CRMProspectos = () => {
             }
         };
         cargar();
+        const interval = setInterval(cargar, 10 * 1000);
+        return () => clearInterval(interval);
     }, [esProspector]);
 
     const handleCrearProspectoApi = async () => {

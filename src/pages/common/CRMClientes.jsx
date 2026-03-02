@@ -53,6 +53,8 @@ const CRMClientes = () => {
 
     useEffect(() => {
         cargarClientes();
+        const interval = setInterval(cargarClientes, 10 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     const handleVerDetalles = async (cliente) => {

@@ -83,7 +83,7 @@ const ProspectorDashboard = () => {
         const interval = setInterval(() => {
             cargarDatos();
             cargarTareas();
-        }, 2 * 60 * 1000);
+        }, 10 * 1000);
         return () => clearInterval(interval);
     }, []);
 

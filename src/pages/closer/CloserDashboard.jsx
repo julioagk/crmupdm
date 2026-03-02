@@ -155,6 +155,11 @@ const CloserDashboard = () => {
     useEffect(() => {
         cargarDatos();
         cargarProximasReuniones();
+        const interval = setInterval(() => {
+            cargarDatos();
+            cargarProximasReuniones();
+        }, 10 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     if (loading) {

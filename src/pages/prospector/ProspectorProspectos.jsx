@@ -130,6 +130,12 @@ const ProspectorProspectos = () => {
 
   useEffect(() => { fetchProspectos(); }, [fetchProspectos]);
 
+  // Auto-refresh cada 10 segundos
+  useEffect(() => {
+    const interval = setInterval(() => fetchProspectos(), 10 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchProspectos]);
+
   const handleExportCsv = () => {
     if (prospectos.length === 0) { toast.error('No hay prospectos para exportar.'); return; }
     const csv = prospectosToCsv(prospectos);

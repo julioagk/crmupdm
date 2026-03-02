@@ -262,6 +262,8 @@ const ProspectorSeguimiento = () => {
             }
         };
         init();
+        const interval = setInterval(cargarDatos, 10 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     // Orden de prioridad de etapas (más avanzadas primero, perdido al fondo)
