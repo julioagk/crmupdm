@@ -33,7 +33,7 @@ const CAMEL_COLS = [
   'vendedorAsignado', 'fechaRegistro', 'ultimaInteraccion', 'proximaLlamada',
   'cambioEtapa', 'etapaAnterior', 'etapaNueva', 'fechaLimite', 'fechaCreacion',
   'googleRefreshToken', 'googleAccessToken', 'googleTokenExpiry',
-  'vendedorNombre', 'vendedorRol', 'closerNombre'
+  'vendedorNombre', 'vendedorRol', 'closerNombre', 'sitioWeb'
 ];
 
 // Helper: convierte '?' a '$1', '$2', etc. para Postgres  y  normaliza columnas camelCase a minúsculas
@@ -63,7 +63,8 @@ const pgMap = {
   etapanueva: 'etapaNueva', fechalimite: 'fechaLimite',
   fechacreacion: 'fechaCreacion', googlerefreshtoken: 'googleRefreshToken',
   googleaccesstoken: 'googleAccessToken', googletokenexpiry: 'googleTokenExpiry',
-  vendedornombre: 'vendedorNombre', vendedorrol: 'vendedorRol', closernombre: 'closerNombre'
+  vendedornombre: 'vendedorNombre', vendedorrol: 'vendedorRol', closernombre: 'closerNombre',
+  sitioweb: 'sitioWeb'
 };
 
 const mapPgRow = (row) => {
@@ -168,7 +169,8 @@ const initDb = async () => {
     ultimaInteraccion TEXT DEFAULT CURRENT_TIMESTAMP,
     notas TEXT,
     interes INTEGER DEFAULT 0,
-    proximaLlamada TEXT
+    proximaLlamada TEXT,
+    sitioWeb TEXT
   );
 
   CREATE TABLE IF NOT EXISTS actividades (
@@ -246,6 +248,21 @@ const initDb = async () => {
     console.log('✅ Migración etapaEmbudo completada');
   } catch (e) {
     console.error('⚠️ Migración etapaEmbudo falló (no crítico):', e.message);
+  }
+
+  // Migración: agregar columna sitioWeb si no existe
+  try {
+    if (isPostgres) {
+      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS sitioweb TEXT');
+    } else {
+      internalDb.prepare('ALTER TABLE clientes ADD COLUMN sitioWeb TEXT').run();
+    }
+    console.log('✅ Migración sitioWeb completada');
+  } catch (e) {
+    // Ignorar error si la columna ya existe
+    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
+      console.error('⚠️ Migración sitioWeb falló (no crítico):', e.message);
+    }
   }
 };
 
