@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Phone,
@@ -18,7 +18,13 @@ import {
     ArrowLeft,
     Edit2,
     Filter,
-    Bell
+    Bell,
+    Download,
+    Upload,
+    Trash2,
+    AlertCircle,
+    FileText,
+    X
 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -26,6 +32,58 @@ import { getToken } from '../../utils/authUtils';
 import HistorialInteracciones from '../../components/HistorialInteracciones';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+// --- CSV helpers ---
+const CSV_HEADERS = ['nombres', 'apellidoPaterno', 'apellidoMaterno', 'telefono', 'correo', 'empresa', 'notas'];
+const CSV_LABELS  = ['Nombres', 'Apellido Paterno', 'Apellido Materno', 'Telefono', 'Correo', 'Empresa', 'Notas'];
+
+function prospectosToCsv(prospectos) {
+    const escape = (val) => {
+        if (val == null) return '';
+        const s = String(val).replace(/"/g, '""');
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
+    };
+    const rows = [CSV_LABELS.join(',')];
+    for (const p of prospectos) rows.push(CSV_HEADERS.map(h => escape(p[h])).join(','));
+    return rows.join('\n');
+}
+
+function parseCsvRow(row) {
+    const cells = [];
+    let cur = ''; let inQuote = false;
+    for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+        if (ch === '"') { if (inQuote && row[i+1] === '"') { cur += '"'; i++; } else inQuote = !inQuote; }
+        else if (ch === ',' && !inQuote) { cells.push(cur.trim()); cur = ''; }
+        else cur += ch;
+    }
+    cells.push(cur.trim());
+    return cells;
+}
+
+function csvToProspectos(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return { data: [], errors: ['El CSV está vacío o solo tiene encabezados.'] };
+    const header = parseCsvRow(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, ''));
+    const colMap = {
+        nombres: ['nombres','nombre'], apellidoPaterno: ['apellidopaterno','apellido'],
+        apellidoMaterno: ['apellidomaterno'], telefono: ['telefono','tel','phone'],
+        correo: ['correo','email','mail'], empresa: ['empresa','company'],
+        notas: ['notas','nota','notes','comentarios'],
+    };
+    const colIndex = {};
+    for (const [field, aliases] of Object.entries(colMap)) {
+        for (const alias of aliases) { const idx = header.indexOf(alias); if (idx !== -1) { colIndex[field] = idx; break; } }
+    }
+    const errors = []; const data = [];
+    for (let i = 1; i < lines.length; i++) {
+        const cells = parseCsvRow(lines[i]);
+        const row = {};
+        for (const [field, idx] of Object.entries(colIndex)) row[field] = cells[idx] || '';
+        data.push(row);
+    }
+    return { data, errors };
+}
 
 const TIPOS_ACTIVIDAD = [
     { value: 'llamada', label: 'Llamada', icon: Phone, color: 'bg-blue-500' },
@@ -92,6 +150,16 @@ const ProspectorSeguimiento = () => {
     const [notaDescarte, setNotaDescarte] = useState('');
     const [loadingConversion, setLoadingConversion] = useState(false);
 
+    // Estados para CSV y eliminar
+    const [prospectoAEliminar, setProspectoAEliminar] = useState(null);
+    const [eliminando, setEliminando] = useState(false);
+    const [isImportModalAbierto, setIsImportModalAbierto] = useState(false);
+    const [csvFile, setCsvFile] = useState(null);
+    const [csvPreview, setCsvPreview] = useState(null);
+    const [importando, setImportando] = useState(false);
+    const [importResult, setImportResult] = useState(null);
+    const fileInputRef = useRef(null);
+
     const abrirModalEditar = (p) => {
         setProspectoAEditar({
             id: p._id || p.id,
@@ -109,11 +177,6 @@ const ProspectorSeguimiento = () => {
     };
 
     const handleEditarProspecto = async () => {
-        const { nombres, telefono } = prospectoAEditar;
-        if (!nombres?.trim() || !telefono?.trim()) {
-            toast.error('Nombres y teléfono son requeridos');
-            return;
-        }
         setLoadingEditar(true);
         try {
             await axios.put(`${API_URL}/api/${rolePath}/prospectos/${prospectoAEditar.id}/editar`, prospectoAEditar, {
@@ -246,12 +309,58 @@ const ProspectorSeguimiento = () => {
             return orA - orB;
         });
 
+    const handleExportCsv = () => {
+        if (prospectos.length === 0) { toast.error('No hay prospectos para exportar.'); return; }
+        const csv = prospectosToCsv(prospectos);
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = `prospectos_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`${prospectos.length} prospectos exportados.`);
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        setCsvFile(file); setImportResult(null);
+        const reader = new FileReader();
+        reader.onload = (evt) => setCsvPreview(csvToProspectos(evt.target.result));
+        reader.readAsText(file, 'UTF-8');
+    };
+
+    const handleImportCsv = async () => {
+        if (!csvPreview || csvPreview.data.length === 0) { toast.error('No hay datos válidos para importar.'); return; }
+        try {
+            setImportando(true);
+            const response = await axios.post(`${API_URL}/api/${rolePath}/importar-csv`, { prospectos: csvPreview.data }, { headers: getAuthHeaders() });
+            setImportResult(response.data);
+            cargarDatos();
+            toast.success(`Importación completada: ${response.data.insertados} nuevos.`);
+        } catch (error) {
+            toast.error(error.response?.data?.msg || 'Error al importar el CSV.');
+        } finally { setImportando(false); }
+    };
+
+    const resetImportModal = () => {
+        setCsvFile(null); setCsvPreview(null); setImportResult(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setIsImportModalAbierto(false);
+    };
+
+    const handleEliminarProspecto = async () => {
+        if (!prospectoAEliminar) return;
+        try {
+            setEliminando(true);
+            await axios.delete(`${API_URL}/api/${rolePath}/prospectos/${prospectoAEliminar.id || prospectoAEliminar._id}`, { headers: getAuthHeaders() });
+            toast.success('Prospecto eliminado correctamente');
+            setProspectoAEliminar(null);
+            cargarDatos();
+        } catch (error) {
+            toast.error(error.response?.data?.msg || 'Error al eliminar el prospecto');
+        } finally { setEliminando(false); }
+    };
+
     const handleCrearProspecto = async () => {
-        const { nombres, telefono } = formCrear;
-        if (!nombres?.trim() || !telefono?.trim()) {
-            toast.error('Nombres y teléfono son requeridos');
-            return;
-        }
         setLoadingCrear(true);
         try {
             await axios.post(`${API_URL}/api/${rolePath}/crear-prospecto`, formCrear, {
@@ -355,7 +464,7 @@ const ProspectorSeguimiento = () => {
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Nombres *</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Nombres</label>
                                     <input
                                         type="text"
                                         value={formCrear.nombres}
@@ -365,7 +474,7 @@ const ProspectorSeguimiento = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Apellido *</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label>
                                     <input
                                         type="text"
                                         value={formCrear.apellidoPaterno}
@@ -375,7 +484,7 @@ const ProspectorSeguimiento = () => {
                                     />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono *</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
                                     <input
                                         type="tel"
                                         value={formCrear.telefono}
@@ -437,7 +546,7 @@ const ProspectorSeguimiento = () => {
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Nombres *</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Nombres</label>
                                     <input
                                         type="text"
                                         value={prospectoAEditar.nombres}
@@ -446,7 +555,7 @@ const ProspectorSeguimiento = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Apellido *</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label>
                                     <input
                                         type="text"
                                         value={prospectoAEditar.apellidoPaterno}
@@ -455,7 +564,7 @@ const ProspectorSeguimiento = () => {
                                     />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono *</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
                                     <input
                                         type="tel"
                                         value={prospectoAEditar.telefono}
@@ -594,6 +703,105 @@ const ProspectorSeguimiento = () => {
                             >
                                 {loadingConversion ? 'Procesando...' : '✓ Descartar'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Eliminar Prospecto */}
+            {prospectoAEliminar && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-lg max-w-sm w-full">
+                        <div className="p-4 border-b border-red-100 bg-red-50 flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                            <h2 className="text-lg font-bold text-red-800">Eliminar prospecto</h2>
+                        </div>
+                        <div className="p-4">
+                            <p className="text-gray-600 text-sm">
+                                ¿Estás seguro de eliminar a <strong>{prospectoAEliminar.nombres} {prospectoAEliminar.apellidoPaterno}</strong>?
+                                Esta acción no se puede deshacer.
+                            </p>
+                        </div>
+                        <div className="flex gap-2 p-4 border-t border-slate-100">
+                            <button
+                                onClick={() => setProspectoAEliminar(null)}
+                                className="flex-1 px-3 py-2 border border-slate-200 text-gray-700 rounded text-sm hover:bg-slate-50 font-medium"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleEliminarProspecto}
+                                disabled={eliminando}
+                                className="flex-1 px-3 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Importar CSV */}
+            {isImportModalAbierto && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-gray-900">Importar Prospectos desde CSV</h2>
+                            <button onClick={resetImportModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                                <p className="font-semibold mb-1">Formato esperado:</p>
+                                <p className="font-mono bg-amber-100 rounded p-1 overflow-x-auto whitespace-nowrap">Nombres,Apellido Paterno,Apellido Materno,Telefono,Correo,Empresa,Notas</p>
+                                <p className="mt-1">Todos los campos son opcionales.</p>
+                            </div>
+                            {!importResult ? (
+                                <>
+                                    <div
+                                        className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-all"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileChange({ target: { files: [f] } }); }}
+                                    >
+                                        <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileChange} />
+                                        <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                        {csvFile ? (
+                                            <p className="font-semibold text-slate-700 text-sm">{csvFile.name}</p>
+                                        ) : (
+                                            <p className="text-slate-500 text-sm">Arrastra un CSV aquí o haz clic para seleccionar</p>
+                                        )}
+                                    </div>
+                                    {csvPreview && (
+                                        <div className="text-sm">
+                                            <p className="font-semibold text-slate-700">{csvPreview.data.length} prospectos listos para importar</p>
+                                            {csvPreview.errors.length > 0 && (
+                                                <ul className="mt-1 text-amber-700 text-xs list-disc pl-4">
+                                                    {csvPreview.errors.slice(0, 3).map((e, i) => <li key={i}>{e}</li>)}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <button onClick={resetImportModal} className="flex-1 px-3 py-2 border border-slate-200 text-gray-700 rounded text-sm hover:bg-slate-50 font-medium">Cancelar</button>
+                                        <button
+                                            onClick={handleImportCsv}
+                                            disabled={importando || !csvPreview || csvPreview.data.length === 0}
+                                            className="flex-1 px-3 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700 font-medium disabled:opacity-50"
+                                        >
+                                            {importando ? 'Importando...' : `Importar ${csvPreview?.data.length || 0} prospectos`}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+                                        <p className="font-semibold">✓ Importación completada</p>
+                                        <p>Insertados: {importResult.insertados} · Duplicados: {importResult.duplicados} · Errores: {importResult.errores}</p>
+                                    </div>
+                                    <button onClick={resetImportModal} className="w-full px-3 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700 font-medium">Cerrar</button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1094,12 +1302,28 @@ const ProspectorSeguimiento = () => {
                             Selecciona un prospecto para ver su ficha y registrar interacciones
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {usandoMock && (
                             <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-lg">
                                 Datos de demostración
                             </span>
                         )}
+                        <button
+                            onClick={handleExportCsv}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors font-medium text-sm"
+                            title="Exportar lista actual a CSV"
+                        >
+                            <Download className="w-4 h-4" />
+                            Exportar CSV
+                        </button>
+                        <button
+                            onClick={() => setIsImportModalAbierto(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors font-medium text-sm"
+                            title="Importar prospectos desde CSV"
+                        >
+                            <Upload className="w-4 h-4" />
+                            Importar CSV
+                        </button>
                         <button
                             onClick={() => setModalCrearAbierto(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
@@ -1255,6 +1479,13 @@ const ProspectorSeguimiento = () => {
                                                         title="Editar Prospecto"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setProspectoAEliminar(p); }}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50"
+                                                        title="Eliminar Prospecto"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleSeleccionarProspecto(p); }}
