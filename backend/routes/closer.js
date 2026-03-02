@@ -399,10 +399,31 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
             params.push(parseInt(interes));
         }
 
-        // Cambio de etapa: auto-promoción o explícito
-        let nuevaEtapa = (tipo === 'llamada' && resultadoFinal === 'exitoso' && cliente.etapaEmbudo === 'prospecto_nuevo')
-            ? 'en_contacto'
-            : etapaEmbudo;
+        // ============ AUTO-PROMOCIÓN DE ETAPA ============
+        const etapaActual = cliente.etapaEmbudo || 'prospecto_nuevo';
+        const ORDEN_ETAPAS = ['prospecto_nuevo', 'en_contacto', 'reunion_agendada', 'reunion_realizada', 'en_negociacion', 'venta_ganada'];
+        const rankActual = ORDEN_ETAPAS.indexOf(etapaActual);
+        let nuevaEtapaAuto = null;
+
+        if (tipo === 'llamada' && resultadoFinal === 'exitoso') {
+            if (etapaActual === 'prospecto_nuevo') nuevaEtapaAuto = 'en_contacto';
+        } else if ((tipo === 'whatsapp' || tipo === 'correo' || tipo === 'mensaje') && resultadoFinal === 'exitoso') {
+            if (etapaActual === 'prospecto_nuevo') nuevaEtapaAuto = 'en_contacto';
+        } else if (tipo === 'cita' && resultadoFinal === 'exitoso') {
+            const rankCita = ORDEN_ETAPAS.indexOf('reunion_agendada');
+            if (rankActual < rankCita) nuevaEtapaAuto = 'reunion_agendada';
+        } else if (tipo === 'cita' && resultadoFinal === 'convertido') {
+            const rankReal = ORDEN_ETAPAS.indexOf('reunion_realizada');
+            if (rankActual < rankReal) nuevaEtapaAuto = 'reunion_realizada';
+        } else if (tipo === 'descartado') {
+            nuevaEtapaAuto = 'perdido';
+        }
+
+        let nuevaEtapa = etapaEmbudo || nuevaEtapaAuto;
+        if (nuevaEtapa && nuevaEtapa !== 'perdido') {
+            const rankNueva = ORDEN_ETAPAS.indexOf(nuevaEtapa);
+            if (rankNueva !== -1 && rankNueva <= rankActual) nuevaEtapa = null;
+        }
 
         if (nuevaEtapa && nuevaEtapa !== cliente.etapaEmbudo) {
             updates.push('etapaEmbudo = ?');

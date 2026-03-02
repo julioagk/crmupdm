@@ -78,6 +78,8 @@ const CloserMonitoreoProspectors = () => {
 
     useEffect(() => {
         cargarDatos();
+        const interval = setInterval(cargarDatos, 60 * 1000);
+        return () => clearInterval(interval);
     }, [periodo]);
 
     const getColorClasses = (color) => {
@@ -177,9 +179,9 @@ const CloserMonitoreoProspectors = () => {
                                         </div>
                                     </div>
                                     <div className={`inline-flex items-center gap-1.5 px-3 py-1 ml-[68px] ${selectedProspector.rendimiento.color === 'green' ? 'bg-green-500 text-white' :
-                                            selectedProspector.rendimiento.color === 'yellow' ? 'bg-yellow-500 text-white' :
-                                                selectedProspector.rendimiento.color === 'orange' ? 'bg-orange-500 text-white' :
-                                                    'bg-red-500 text-white'
+                                        selectedProspector.rendimiento.color === 'yellow' ? 'bg-yellow-500 text-white' :
+                                            selectedProspector.rendimiento.color === 'orange' ? 'bg-orange-500 text-white' :
+                                                'bg-red-500 text-white'
                                         } rounded-full text-xs font-bold shadow-md`}>
                                         {getEstadoIcon(selectedProspector.rendimiento.estado)}
                                         <span className="capitalize">{selectedProspector.rendimiento.estado.toUpperCase()}</span>

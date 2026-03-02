@@ -27,6 +27,8 @@ const ProspectorEstadisticas = () => {
 
     useEffect(() => {
         cargarEstadisticas();
+        const interval = setInterval(cargarEstadisticas, 5 * 60 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     const getTrendColor = (value) => {
@@ -142,9 +144,9 @@ const ProspectorEstadisticas = () => {
                                 <span className="text-green-400 font-bold">{stats.metricas.hoy.exitosas}</span>
                             </div>
                             <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full" 
-                                    style={{ width: `${Math.min(100, stats.metricas.hoy.tasaContacto)}%` }} 
+                                <div
+                                    className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
+                                    style={{ width: `${Math.min(100, stats.metricas.hoy.tasaContacto)}%` }}
                                 />
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-700">
@@ -166,9 +168,9 @@ const ProspectorEstadisticas = () => {
                                 <span className="text-blue-400 font-bold">{stats.metricas.semana.exitosas}</span>
                             </div>
                             <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full" 
-                                    style={{ width: `${Math.min(100, stats.metricas.semana.tasaContacto)}%` }} 
+                                <div
+                                    className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full"
+                                    style={{ width: `${Math.min(100, stats.metricas.semana.tasaContacto)}%` }}
                                 />
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-700">
@@ -190,9 +192,9 @@ const ProspectorEstadisticas = () => {
                                 <span className="text-purple-400 font-bold">{stats.metricas.mes.exitosas}</span>
                             </div>
                             <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full" 
-                                    style={{ width: `${Math.min(100, stats.metricas.mes.tasaContacto)}%` }} 
+                                <div
+                                    className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full"
+                                    style={{ width: `${Math.min(100, stats.metricas.mes.tasaContacto)}%` }}
                                 />
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-700">
@@ -227,9 +229,9 @@ const ProspectorEstadisticas = () => {
                                     <span className="text-teal-400 font-semibold">{stats.metricas.mes.exitosas}</span>
                                 </div>
                                 <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full" 
-                                        style={{ width: `${stats.metricas.mes.tasaContacto}%` }} 
+                                    <div
+                                        className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full"
+                                        style={{ width: `${stats.metricas.mes.tasaContacto}%` }}
                                     />
                                 </div>
                             </div>
@@ -262,9 +264,9 @@ const ProspectorEstadisticas = () => {
                                     <span className="text-purple-400 font-semibold">{stats.metricas.mes.citas}</span>
                                 </div>
                                 <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full" 
-                                        style={{ width: `${stats.metricas.mes.tasaAgendamiento}%` }} 
+                                    <div
+                                        className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full"
+                                        style={{ width: `${stats.metricas.mes.tasaAgendamiento}%` }}
                                     />
                                 </div>
                             </div>
@@ -332,7 +334,7 @@ const ProspectorEstadisticas = () => {
                                         </td>
                                         <td className="p-4 text-center">
                                             <div className="h-8 bg-gray-700 rounded-full overflow-hidden inline-block w-24">
-                                                <div 
+                                                <div
                                                     className={`h-full rounded-full transition-all ${parseFloat(semana.tasaContacto) >= 60 ? 'bg-green-500' : parseFloat(semana.tasaContacto) >= 40 ? 'bg-yellow-500' : 'bg-orange-500'}`}
                                                     style={{ width: `${Math.min(100, semana.tasaContacto)}%` }}
                                                 />

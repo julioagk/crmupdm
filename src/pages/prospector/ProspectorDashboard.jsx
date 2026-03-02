@@ -80,6 +80,11 @@ const ProspectorDashboard = () => {
     useEffect(() => {
         cargarDatos();
         cargarTareas();
+        const interval = setInterval(() => {
+            cargarDatos();
+            cargarTareas();
+        }, 2 * 60 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     if (loading) {
