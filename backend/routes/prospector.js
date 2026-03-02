@@ -245,9 +245,6 @@ router.get('/clientes-ganados', [auth, esProspector], async (req, res) => {
 router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
     try {
         const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas } = req.body;
-        if (!nombres || !telefono) {
-            return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
-        }
 
         const prospectorId = parseInt(req.usuario.id);
         const rol = String(req.usuario.rol).toLowerCase();
@@ -259,10 +256,10 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
         `);
         const result = await stmt.run(
-            nombres.trim(),
+            (nombres || '').trim(),
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
-            String(telefono).trim(),
+            String(telefono || '').trim(),
             String(correo || '').trim().toLowerCase(),
             (empresa || '').trim(),
             (notas || '').trim(),
@@ -560,10 +557,6 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
         const prospectorId = parseInt(req.usuario.id);
         const now = new Date().toISOString();
 
-        if (!nombres || !telefono) {
-            return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
-        }
-
         const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
         if (!cliente) {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
@@ -575,10 +568,10 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             'interes = ?', 'proximaLlamada = ?', 'ultimaInteraccion = ?'
         ];
         const params = [
-            nombres.trim(),
+            (nombres || '').trim(),
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
-            String(telefono).trim(),
+            String(telefono || '').trim(),
             String(correo || '').trim().toLowerCase(),
             (empresa || '').trim(),
             (notas || '').trim(),
@@ -1032,7 +1025,6 @@ router.post('/importar-csv', [auth, esProspector], async (req, res) => {
         let errores = 0;
         for (const p of prospectos) {
             try {
-                if (!p.nombres && !p.telefono) { errores++; continue; }
                 if (p.telefono) {
                     const existe = await db.prepare('SELECT id FROM clientes WHERE telefono = ? AND prospectorAsignado = ?').get(String(p.telefono).trim(), prospectorId);
                     if (existe) { duplicados++; continue; }

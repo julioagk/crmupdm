@@ -354,9 +354,9 @@ const ProspectorProspectos = () => {
         <Modal isOpen={isModalAbierto} onClose={() => setIsModalAbierto(false)} title="Agregar Nuevo Prospecto">
           <form onSubmit={handleCrearProspecto} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-slate-700 mb-1">Nombres *</label><input type="text" required className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.nombres} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, nombres: e.target.value })} /></div>
+              <div><label className="block text-sm font-semibold text-slate-700 mb-1">Nombres</label><input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.nombres} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, nombres: e.target.value })} /></div>
               <div><label className="block text-sm font-semibold text-slate-700 mb-1">Apellido Paterno</label><input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.apellidoPaterno} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, apellidoPaterno: e.target.value })} /></div>
-              <div><label className="block text-sm font-semibold text-slate-700 mb-1">Telefono *</label><input type="tel" required className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.telefono} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, telefono: e.target.value })} /></div>
+              <div><label className="block text-sm font-semibold text-slate-700 mb-1">Telefono</label><input type="tel" className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.telefono} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, telefono: e.target.value })} /></div>
               <div><label className="block text-sm font-semibold text-slate-700 mb-1">Correo Electronico</label><input type="email" className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.correo} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, correo: e.target.value })} /></div>
               <div className="md:col-span-2"><label className="block text-sm font-semibold text-slate-700 mb-1">Empresa</label><input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={nuevoProspecto.empresa} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, empresa: e.target.value })} /></div>
               <div className="md:col-span-2"><label className="block text-sm font-semibold text-slate-700 mb-1">Notas Iniciales</label><textarea className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px]" value={nuevoProspecto.notas} onChange={(e) => setNuevoProspecto({ ...nuevoProspecto, notas: e.target.value })} placeholder="Informacion relevante sobre el primer contacto..." /></div>
@@ -373,7 +373,7 @@ const ProspectorProspectos = () => {
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
               <p className="font-semibold mb-1">Formato esperado del CSV:</p>
               <p className="font-mono text-xs bg-amber-100 rounded p-2 mt-1 overflow-x-auto whitespace-nowrap">Nombres,Apellido Paterno,Apellido Materno,Telefono,Correo,Empresa,Notas</p>
-              <p className="mt-2 text-amber-700 text-xs">Los campos <strong>Nombres</strong> y/o <strong>Telefono</strong> son obligatorios. Los demas son opcionales.</p>
+              <p className="mt-2 text-amber-700 text-xs">Todos los campos son opcionales. Los datos se importarán tal como estén en el CSV.</p>
             </div>
 
             {!importResult && (
