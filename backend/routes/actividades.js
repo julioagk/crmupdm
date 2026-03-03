@@ -193,4 +193,25 @@ router.put('/:id', auth, esSuperUser, async (req, res) => {
     }
 });
 
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const a = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
+        if (!a) return res.status(404).json({ mensaje: 'Actividad no encontrada' });
+
+        const rol = String(req.usuario.rol).toLowerCase();
+        const esSuperUser = rol === 'admin' || rol === 'superuser';
+        const esOwner = a.vendedor === parseInt(req.usuario.id);
+
+        if (!esOwner && !esSuperUser) {
+            return res.status(403).json({ mensaje: 'No tienes permiso para eliminar esta actividad' });
+        }
+
+        await db.prepare('DELETE FROM actividades WHERE id = ?').run(parseInt(req.params.id));
+        res.json({ mensaje: 'Actividad eliminada correctamente' });
+    } catch (error) {
+        console.error('Error al eliminar actividad:', error);
+        res.status(500).json({ mensaje: 'Error del servidor' });
+    }
+});
+
 module.exports = router;

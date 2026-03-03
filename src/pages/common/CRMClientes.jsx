@@ -75,6 +75,19 @@ const CRMClientes = () => {
         }
     };
 
+    const handleDeleteActividad = async (actividadId) => {
+        try {
+            await axios.delete(
+                `${API_URL}/api/actividades/${actividadId}`,
+                { headers: getAuthHeaders() }
+            );
+            setTimeline(prev => prev.filter(item => item.id !== actividadId));
+        } catch (error) {
+            console.error('Error al eliminar actividad:', error);
+            alert('No se pudo eliminar la actividad.');
+        }
+    };
+
     const clientesFiltrados = useMemo(() => {
         return clientes.filter((cliente) => {
             const matchBusqueda =
@@ -151,6 +164,7 @@ const CRMClientes = () => {
                                 <HistorialInteracciones
                                     timeline={timeline}
                                     esProspector={getRole() === 'prospector'}
+                                    onDeleteActividad={handleDeleteActividad}
                                 />
                             )}
                         </div>

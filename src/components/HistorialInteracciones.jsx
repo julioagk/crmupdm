@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Phone, MessageSquare, User, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
+import { Calendar, Phone, MessageSquare, User, CheckCircle2, AlertCircle, Zap, Trash2 } from 'lucide-react';
 
 /**
  * COMPONENTE MEJORADO: HistorialInteracciones
@@ -11,8 +11,20 @@ import { Calendar, Phone, MessageSquare, User, CheckCircle2, AlertCircle, Zap } 
  * - Rol del vendedor
  */
 
-export const HistorialInteracciones = ({ timeline = [], esProspector = true }) => {
+export const HistorialInteracciones = ({ timeline = [], esProspector = true, onDeleteActividad }) => {
     const [filtroTipo, setFiltroTipo] = useState('todos');
+    const [deletingId, setDeletingId] = useState(null);
+
+    const handleDelete = async (item) => {
+        if (!onDeleteActividad) return;
+        if (!window.confirm(`¿Eliminar esta ${item.tipoActividad || 'actividad'} registrada el ${new Date(item.fecha).toLocaleDateString('es-MX')}? Esta acción no se puede deshacer.`)) return;
+        setDeletingId(item.id);
+        try {
+            await onDeleteActividad(item.id);
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     // Mapeo de iconos por tipo de evento
     const getIcon = (item) => {
@@ -227,7 +239,19 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true }) =
                                             )}
                                         </div>
                                     </div>
-                                    {getRolBadge(item)}
+                                    <div className="flex items-center gap-2">
+                                        {getRolBadge(item)}
+                                        {item.tipo !== 'cambio_etapa' && onDeleteActividad && (
+                                            <button
+                                                onClick={() => handleDelete(item)}
+                                                disabled={deletingId === item.id}
+                                                title="Eliminar actividad"
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-50"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Contenido */}

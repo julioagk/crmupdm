@@ -425,6 +425,17 @@ const ProspectorSeguimiento = () => {
         }
     };
 
+    const handleDeleteActividadContext = async (actividadId) => {
+        if (!window.confirm('¿Eliminar esta actividad? Esta acción no se puede deshacer.')) return;
+        try {
+            await axios.delete(`${API_URL}/api/actividades/${actividadId}`, { headers: getAuthHeaders() });
+            setActividadesContext(prev => prev.filter(a => a.id !== actividadId));
+            toast.success('Actividad eliminada');
+        } catch (error) {
+            toast.error('No se pudo eliminar la actividad');
+        }
+    };
+
     const actualizarInteres = async (id, nuevoInteres) => {
         try {
             await axios.put(`${API_URL}/api/${rolePath}/prospectos/${id}`, { interes: nuevoInteres }, { headers: getAuthHeaders() });
@@ -1343,7 +1354,16 @@ const ProspectorSeguimiento = () => {
                                                 <div className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-100">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <p className="font-semibold text-gray-900 text-sm">{meta.label}</p>
-                                                        <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{formatHora(act.fecha)}</span>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <span className="text-xs text-gray-400 whitespace-nowrap">{formatHora(act.fecha)}</span>
+                                                            <button
+                                                                onClick={() => handleDeleteActividadContext(act.id)}
+                                                                title="Eliminar actividad"
+                                                                className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                     <p className="text-xs text-gray-500 mt-0.5">
                                                         {new Date(act.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
