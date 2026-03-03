@@ -130,12 +130,18 @@ router.get('/freebusy/:closerId', auth, async (req, res) => {
     } catch (error) {
         console.error('Error en freebusy:', error);
         // Detectar token revocado o scopes insuficientes → pedir al usuario re-vincular
-        const msg = error?.message || '';
-        const isAuthError = error?.code === 401 ||
-            msg.includes('insufficient authentication scopes') ||
-            msg.includes('invalid_grant') ||
-            msg.includes('Token has been expired or revoked') ||
-            error?.status === 401;
+        const msg = (error?.message || '').toLowerCase();
+        const nestedMsg = (error?.response?.data?.error?.message || error?.errors?.[0]?.message || '').toLowerCase();
+        const combinedMsg = msg + ' ' + nestedMsg;
+        const isAuthError =
+            error?.code === 401 || error?.code === 403 ||
+            error?.status === 401 || error?.status === 403 ||
+            combinedMsg.includes('insufficient authentication scopes') ||
+            combinedMsg.includes('insufficientscopeerror') ||
+            combinedMsg.includes('invalid_grant') ||
+            combinedMsg.includes('token has been expired or revoked') ||
+            combinedMsg.includes('authError') ||
+            combinedMsg.includes('forbidden');
         if (isAuthError) {
             // Limpiar tokens inválidos del usuario afectado
             try {
