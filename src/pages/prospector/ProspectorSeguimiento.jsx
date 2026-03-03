@@ -1126,9 +1126,6 @@ const ProspectorSeguimiento = () => {
                                         {/* WhatsApp */}
                                         <button
                                             onClick={async () => {
-                                                const phone = (prospectoSeleccionado.telefono || '').replace(/\D/g, '');
-                                                if (!phone) { toast.error('Sin teléfono registrado'); return; }
-                                                window.open(`https://api.whatsapp.com/send?phone=${phone}&text=Hola%20${encodeURIComponent(prospectoSeleccionado.nombres || '')}%2C%20te%20contacto%20de%20parte%20de%20nuestro%20equipo.`, '_blank');
                                                 await registrarActividad({ tipo: 'whatsapp', resultado: 'enviado', notas: 'Mensaje de WhatsApp enviado' });
                                             }}
                                             className="flex flex-col items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-green-500 rounded-xl p-4 text-gray-700 hover:text-green-600 transition-all shadow-sm font-bold text-sm"
