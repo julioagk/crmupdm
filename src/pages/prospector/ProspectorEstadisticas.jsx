@@ -27,7 +27,7 @@ const ProspectorEstadisticas = () => {
 
     useEffect(() => {
         cargarEstadisticas();
-        const interval = setInterval(cargarEstadisticas, 10 * 1000);
+        const interval = setInterval(cargarEstadisticas, 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 

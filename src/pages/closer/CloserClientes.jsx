@@ -44,7 +44,7 @@ const CloserClientes = () => {
         };
 
         fetchClientesGanados();
-        const interval = setInterval(fetchClientesGanados, 10 * 1000);
+        const interval = setInterval(fetchClientesGanados, 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 

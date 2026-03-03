@@ -53,7 +53,7 @@ const CRMClientes = () => {
 
     useEffect(() => {
         cargarClientes();
-        const interval = setInterval(cargarClientes, 10 * 1000);
+        const interval = setInterval(cargarClientes, 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 

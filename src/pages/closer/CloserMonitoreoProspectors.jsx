@@ -117,7 +117,7 @@ const CloserMonitoreoProspectors = () => {
         cargarDatos();
         setExpandedRows(new Set());
         setProspectosData({});
-        const interval = setInterval(cargarDatos, 10 * 1000);
+        const interval = setInterval(cargarDatos, 60 * 1000);
         return () => clearInterval(interval);
     }, [periodo]);
 

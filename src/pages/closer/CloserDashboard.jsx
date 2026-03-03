@@ -158,7 +158,7 @@ const CloserDashboard = () => {
         const interval = setInterval(() => {
             cargarDatos();
             cargarProximasReuniones();
-        }, 10 * 1000);
+        }, 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 
