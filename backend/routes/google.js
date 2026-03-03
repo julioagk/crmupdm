@@ -129,6 +129,26 @@ router.get('/freebusy/:closerId', auth, async (req, res) => {
 
     } catch (error) {
         console.error('Error en freebusy:', error);
+        // Detectar token revocado o scopes insuficientes → pedir al usuario re-vincular
+        const msg = error?.message || '';
+        const isAuthError = error?.code === 401 ||
+            msg.includes('insufficient authentication scopes') ||
+            msg.includes('invalid_grant') ||
+            msg.includes('Token has been expired or revoked') ||
+            error?.status === 401;
+        if (isAuthError) {
+            // Limpiar tokens inválidos del usuario afectado
+            try {
+                await db.prepare(
+                    'UPDATE usuarios SET googleRefreshToken = NULL, googleAccessToken = NULL, googleTokenExpiry = NULL WHERE id = ?'
+                ).run(closerId);
+                console.warn(`⚠️ Tokens de Google limpiados para closer ${closerId} por error de scopes/revocación`);
+            } catch (_) {}
+            return res.status(400).json({
+                msg: 'El closer debe volver a vincular su cuenta de Google Calendar (permisos insuficientes o token revocado).',
+                notLinked: true
+            });
+        }
         res.status(500).json({ msg: 'Error consultando calendario de Google' });
     }
 });
