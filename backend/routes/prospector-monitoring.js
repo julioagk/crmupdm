@@ -74,7 +74,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const row1 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ?').get(prospectorId);
             const clientesTotales = row1.c;
 
-            const row2 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND fechaRegistro >= ?').get(prospectorId, fechaInicioStr);
+            const row2 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))').get(prospectorId, fechaInicioStr, fechaInicioStr);
             const clientesNuevos = row2.c;
 
             const actividades = await db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?').all(prospectorId, fechaInicioStr, ahoraStr);
@@ -111,7 +111,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const row8 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ? AND fechaUltimaEtapa >= ?').get(prospectorId, 'reunion_agendada', hoyStr);
             const citasHoy = row8.c;
 
-            const row9 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND fechaRegistro >= ?').get(prospectorId, hoyStr);
+            const row9 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))').get(prospectorId, hoyStr, hoyStr);
             const clientesNuevosHoy = row9.c;
 
             const rendimientoHoy = calcularEstado(llamadasHoy.length, citasHoy, 'diario');
@@ -135,7 +135,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const row10 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ? AND fechaUltimaEtapa >= ?').get(prospectorId, 'reunion_agendada', semanaStr);
             const citasSemana = row10.c;
 
-            const row11 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND fechaRegistro >= ?').get(prospectorId, semanaStr);
+            const row11 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))').get(prospectorId, semanaStr, semanaStr);
             const clientesNuevosSemana = row11.c;
 
             const rendimientoSemana = calcularEstado(llamadasSemana.length, citasSemana, 'semanal');
@@ -210,9 +210,9 @@ router.get('/monitoring/:prospectorId/prospectos', [auth, esCloserOAdmin], async
         const prospectos = await db.prepare(`
             SELECT id, nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, etapaEmbudo, fechaRegistro
             FROM clientes
-            WHERE prospectorAsignado = ? AND fechaRegistro >= ?
-            ORDER BY fechaRegistro DESC
-        `).all(parseInt(prospectorId), fechaInicioStr);
+            WHERE prospectorAsignado = ? AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))
+            ORDER BY COALESCE(fechaRegistro, fechaUltimaEtapa) DESC
+        `).all(parseInt(prospectorId), fechaInicioStr, fechaInicioStr);
 
         res.json({ prospectos });
     } catch (error) {
