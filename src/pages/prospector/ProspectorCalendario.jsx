@@ -44,7 +44,8 @@ const ProspectorCalendario = () => {
                 if (res.ok) {
                     const data = await res.json();
                     console.log("All Users Data:", data);
-                    const closersList = data.filter(u => u.rol === 'closer');
+                    const OCULTAR_USERS = ['brayan', '@brayan', 'closer'];
+                    const closersList = data.filter(u => u.rol === 'closer' && !OCULTAR_USERS.includes(u.usuario?.toLowerCase()));
                     console.log("Filtered Closers:", closersList);
                     setClosers(closersList);
                 } else {
