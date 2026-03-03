@@ -130,9 +130,9 @@ const ProspectorProspectos = () => {
 
   useEffect(() => { fetchProspectos(); }, [fetchProspectos]);
 
-  // Auto-refresh cada 1 minuto
+  // Auto-refresh cada 5 minutos
   useEffect(() => {
-    const interval = setInterval(() => fetchProspectos(), 60 * 1000);
+    const interval = setInterval(() => fetchProspectos(), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchProspectos]);
 

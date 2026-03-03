@@ -57,6 +57,8 @@ export default function VendedorAjustes() {
     const loginGoogle = useGoogleLogin({
         flow: 'auth-code',
         scope: 'https://www.googleapis.com/auth/calendar',
+        access_type: 'offline',
+        prompt: 'consent',
         onSuccess: async (codeResponse) => {
             const tid = toast.loading('Vinculando cuenta de Google...');
             try {

@@ -136,7 +136,7 @@ const CRMProspectos = () => {
             }
         };
         cargar();
-        const interval = setInterval(cargar, 60 * 1000);
+        const interval = setInterval(cargar, 5 * 60 * 1000);
         return () => clearInterval(interval);
     }, [esProspector]);
 
