@@ -244,7 +244,7 @@ router.get('/clientes-ganados', [auth, esProspector], async (req, res) => {
 // POST /api/prospector/crear-prospecto
 router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
     try {
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, sitioWeb, ubicacion } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas, sitioWeb, ubicacion } = req.body;
 
         const prospectorId = parseInt(req.usuario.id);
         const rol = String(req.usuario.rol).toLowerCase();
@@ -252,14 +252,15 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
         const now = new Date().toISOString();
 
         const stmt = await db.prepare(`
-            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, sitioWeb, ubicacion, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
+            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas, sitioWeb, ubicacion, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
         `);
         const result = await stmt.run(
             (nombres || '').trim(),
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
             String(telefono || '').trim(),
+            String(telefono2 || '').trim(),
             String(correo || '').trim().toLowerCase(),
             (empresa || '').trim(),
             (notas || '').trim(),
@@ -555,7 +556,7 @@ router.put('/prospectos/:id', auth, async (req, res) => {
 router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
     try {
         const prospectoId = parseInt(req.params.id);
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, ubicacion, notas, etapaEmbudo, sitioWeb } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, ubicacion, notas, etapaEmbudo, sitioWeb } = req.body;
         const prospectorId = parseInt(req.usuario.id);
         const now = new Date().toISOString();
 
@@ -566,7 +567,7 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
 
         const updates = [
             'nombres = ?', 'apellidoPaterno = ?', 'apellidoMaterno = ?',
-            'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?', 'sitioWeb = ?', 'ubicacion = ?',
+            'telefono = ?', 'telefono2 = ?', 'correo = ?', 'empresa = ?', 'notas = ?', 'sitioWeb = ?', 'ubicacion = ?',
             'interes = ?', 'proximaLlamada = ?', 'ultimaInteraccion = ?'
         ];
         const params = [
@@ -574,6 +575,7 @@ router.put('/prospectos/:id/editar', [auth, esProspector], async (req, res) => {
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
             String(telefono || '').trim(),
+            String(telefono2 || '').trim(),
             String(correo || '').trim().toLowerCase(),
             (empresa || '').trim(),
             (notas || '').trim(),

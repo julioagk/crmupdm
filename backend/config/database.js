@@ -155,6 +155,7 @@ const initDb = async () => {
     apellidoPaterno TEXT NOT NULL,
     apellidoMaterno TEXT,
     telefono TEXT NOT NULL,
+    telefono2 TEXT,
     correo TEXT NOT NULL,
     empresa TEXT,
     estado TEXT DEFAULT 'proceso' CHECK(estado IN ('ganado','perdido','proceso')),
@@ -275,6 +276,18 @@ const initDb = async () => {
     // Ignorar error si la columna ya existe
     if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
       console.error('⚠️ Migración sitioWeb falló (no crítico):', e.message);
+    }
+  }
+  try {
+    if (isPostgres) {
+      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS telefono2 TEXT');
+    } else {
+      internalDb.prepare('ALTER TABLE clientes ADD COLUMN telefono2 TEXT').run();
+    }
+    console.log('✅ Migración telefono2 completada');
+  } catch (e) {
+    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
+      console.error('⚠️ Migración telefono2 falló (no crítico):', e.message);
     }
   }
 };

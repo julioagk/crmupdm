@@ -133,6 +133,7 @@ const ProspectorSeguimiento = () => {
         apellidoPaterno: '',
         apellidoMaterno: '',
         telefono: '',
+        telefono2: '',
         correo: '',
         empresa: '',
         sitioWeb: '',
@@ -169,6 +170,7 @@ const ProspectorSeguimiento = () => {
             apellidoPaterno: p.apellidoPaterno || '',
             apellidoMaterno: p.apellidoMaterno || '',
             telefono: p.telefono || '',
+            telefono2: p.telefono2 || '',
             correo: p.correo || '',
             empresa: p.empresa || '',
             sitioWeb: p.sitioWeb || '',
@@ -374,7 +376,7 @@ const ProspectorSeguimiento = () => {
             });
             toast.success('Prospecto creado');
             setModalCrearAbierto(false);
-            setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
+            setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', telefono2: '', correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
             cargarDatos();
         } catch (error) {
             toast.error(error.response?.data?.msg || 'Error al crear');
@@ -489,14 +491,24 @@ const ProspectorSeguimiento = () => {
                                         placeholder="García"
                                     />
                                 </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono 1</label>
                                     <input
                                         type="tel"
                                         value={formCrear.telefono}
                                         onChange={(e) => setFormCrear((f) => ({ ...f, telefono: e.target.value }))}
                                         className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
                                         placeholder="+55 1234 5678"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono 2 <span className="text-gray-400 font-normal">(opcional)</span></label>
+                                    <input
+                                        type="tel"
+                                        value={formCrear.telefono2}
+                                        onChange={(e) => setFormCrear((f) => ({ ...f, telefono2: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                        placeholder="+55 8765 4321"
                                     />
                                 </div>
                                 <div className="col-span-2">
@@ -555,7 +567,7 @@ const ProspectorSeguimiento = () => {
                             <button
                                 onClick={() => {
                                     setModalCrearAbierto(false);
-                                    setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
+                                    setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefono: '', telefono2: '', correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
                                 }}
                                 className="flex-1 px-3 py-2 border border-slate-200 text-gray-700 rounded text-sm hover:bg-slate-50 font-medium"
                             >
@@ -599,13 +611,23 @@ const ProspectorSeguimiento = () => {
                                         className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
                                     />
                                 </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono 1</label>
                                     <input
                                         type="tel"
                                         value={prospectoAEditar.telefono}
                                         onChange={(e) => setProspectoAEditar((f) => ({ ...f, telefono: e.target.value }))}
                                         className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono 2 <span className="text-gray-400 font-normal">(opcional)</span></label>
+                                    <input
+                                        type="tel"
+                                        value={prospectoAEditar.telefono2 || ''}
+                                        onChange={(e) => setProspectoAEditar((f) => ({ ...f, telefono2: e.target.value }))}
+                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                        placeholder="+55 8765 4321"
                                     />
                                 </div>
                                 <div className="col-span-2">
@@ -1009,6 +1031,9 @@ const ProspectorSeguimiento = () => {
                                         <div className="flex flex-wrap gap-3 mt-3 text-sm text-gray-500">
                                             {prospectoSeleccionado.telefono && (
                                                 <span className="flex items-center gap-1"><Phone className="w-4 h-4" /> {prospectoSeleccionado.telefono}</span>
+                                            )}
+                                            {prospectoSeleccionado.telefono2 && (
+                                                <span className="flex items-center gap-1"><Phone className="w-4 h-4" /> {prospectoSeleccionado.telefono2}</span>
                                             )}
                                             {prospectoSeleccionado.correo && (
                                                 <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> {prospectoSeleccionado.correo}</span>

@@ -309,7 +309,7 @@ router.get('/clientes-ganados', [auth, esCloser], async (req, res) => {
 // POST /api/closer/crear-prospecto
 router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
     try {
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas } = req.body;
         if (!nombres || !telefono) {
             return res.status(400).json({ msg: 'Nombres y teléfono son requeridos' });
         }
@@ -319,14 +319,15 @@ router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
 
         // MEJORADO: Incluir vendedorAsignado y prospectorAsignado para consistencia en Postgres
         const stmt = await db.prepare(`
-            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo, fechaRegistro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo', ?)
+            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo, fechaRegistro)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo', ?)
         `);
         const result = await stmt.run(
             nombres.trim(),
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
             String(telefono).trim(),
+            String(telefono2 || '').trim(),
             String(correo || '').trim().toLowerCase(),
             (empresa || '').trim(),
             (notas || '').trim(),
@@ -674,7 +675,7 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
 router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
     try {
         const prospectoId = parseInt(req.params.id);
-        const { nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, notas, etapaEmbudo, interes, proximaLlamada } = req.body;
+        const { nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas, etapaEmbudo, interes, proximaLlamada } = req.body;
         const now = new Date().toISOString();
 
         const c = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
@@ -682,7 +683,7 @@ router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
 
         const updates = [
             'nombres = ?', 'apellidoPaterno = ?', 'apellidoMaterno = ?',
-            'telefono = ?', 'correo = ?', 'empresa = ?', 'notas = ?',
+            'telefono = ?', 'telefono2 = ?', 'correo = ?', 'empresa = ?', 'notas = ?',
             'ultimaInteraccion = ?'
         ];
         const params = [
@@ -690,6 +691,7 @@ router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
             (apellidoPaterno || '').trim(),
             (apellidoMaterno || '').trim(),
             String(telefono).trim(),
+            String(telefono2 || '').trim(),
             String(correo || '').trim().toLowerCase(),
             (empresa || '').trim(),
             (notas || '').trim(),
