@@ -753,7 +753,9 @@ router.delete('/prospectos/:id', [auth, esCloser], async (req, res) => {
             return res.status(404).json({ msg: 'Prospecto no encontrado' });
         }
 
-        // Eliminar actividades asociadas primero (integridad referencial)
+        // Eliminar registros relacionados primero (integridad referencial)
+        await db.prepare('DELETE FROM tareas WHERE cliente = ?').run(prospectoId);
+        await db.prepare('DELETE FROM ventas WHERE cliente = ?').run(prospectoId);
         await db.prepare('DELETE FROM actividades WHERE cliente = ?').run(prospectoId);
         // Eliminar el prospecto
         await db.prepare('DELETE FROM clientes WHERE id = ?').run(prospectoId);

@@ -1074,7 +1074,9 @@ router.delete('/prospectos/:id', [auth, esProspector], async (req, res) => {
             return res.status(403).json({ msg: 'No tienes permiso para eliminar este prospecto' });
         }
 
-        // Eliminar actividades asociadas primero (integridad referencial)
+        // Eliminar registros relacionados primero (integridad referencial)
+        await db.prepare('DELETE FROM tareas WHERE cliente = ?').run(prospectoId);
+        await db.prepare('DELETE FROM ventas WHERE cliente = ?').run(prospectoId);
         await db.prepare('DELETE FROM actividades WHERE cliente = ?').run(prospectoId);
         // Eliminar el prospecto
         await db.prepare('DELETE FROM clientes WHERE id = ?').run(prospectoId);
