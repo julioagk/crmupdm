@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Phone, Calendar, TrendingUp, RefreshCw, Activity, Target, AlertCircle, CheckCircle2, X, ChevronRight, BarChart3, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Users, Phone, Calendar, TrendingUp, RefreshCw, Activity, Target, AlertCircle, CheckCircle2, X, ChevronRight, ChevronDown, BarChart3, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -11,6 +11,8 @@ const CloserMonitoreoProspectors = () => {
     const [usandoMock, setUsandoMock] = useState(false);
     const [selectedProspector, setSelectedProspector] = useState(null);
     const [viewMode, setViewMode] = useState('cards'); // 'cards' o 'table'
+    const [expandedRows, setExpandedRows] = useState(new Set());
+    const [prospectosData, setProspectosData] = useState({});
 
     const mockData = {
         periodo: 'diario',
@@ -58,6 +60,41 @@ const CloserMonitoreoProspectors = () => {
         ]
     };
 
+    const etapaLabel = (etapa) => {
+        const etiquetas = {
+            prospecto_nuevo: 'Prospecto Nuevo',
+            en_contacto: 'En Contacto',
+            reunion_agendada: 'Reunión Agendada',
+            transferido: 'Transferido',
+            perdido: 'Perdido',
+            venta_ganada: 'Venta Ganada',
+        };
+        return etiquetas[etapa] || etapa;
+    };
+
+    const toggleProspectos = async (prospectorId) => {
+        const newExpanded = new Set(expandedRows);
+        if (newExpanded.has(prospectorId)) {
+            newExpanded.delete(prospectorId);
+            setExpandedRows(newExpanded);
+            return;
+        }
+        newExpanded.add(prospectorId);
+        setExpandedRows(newExpanded);
+        if (prospectosData[prospectorId]) return; // ya cargados
+        setProspectosData(prev => ({ ...prev, [prospectorId]: { loading: true, prospectos: [] } }));
+        try {
+            const response = await axios.get(
+                `${API_URL}/api/closer/prospectors/monitoring/${prospectorId}/prospectos`,
+                { params: { periodo }, headers: { 'x-auth-token': localStorage.getItem('token') } }
+            );
+            setProspectosData(prev => ({ ...prev, [prospectorId]: { loading: false, prospectos: response.data.prospectos || [] } }));
+        } catch (err) {
+            console.error('Error cargando prospectos:', err);
+            setProspectosData(prev => ({ ...prev, [prospectorId]: { loading: false, prospectos: [] } }));
+        }
+    };
+
     const cargarDatos = async () => {
         setLoading(true);
         try {
@@ -78,6 +115,8 @@ const CloserMonitoreoProspectors = () => {
 
     useEffect(() => {
         cargarDatos();
+        setExpandedRows(new Set());
+        setProspectosData({});
         const interval = setInterval(cargarDatos, 10 * 1000);
         return () => clearInterval(interval);
     }, [periodo]);
@@ -460,6 +499,7 @@ const CloserMonitoreoProspectors = () => {
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
+                                    <th className="px-3 py-4 w-10"></th>
                                     <th className="text-left px-6 py-4 text-gray-700 font-semibold text-sm">Prospector</th>
                                     <th className="text-center px-6 py-4 text-gray-700 font-semibold text-sm">Llamadas</th>
                                     <th className="text-center px-6 py-4 text-gray-700 font-semibold text-sm">Exitosas</th>
@@ -474,8 +514,22 @@ const CloserMonitoreoProspectors = () => {
                             <tbody>
                                 {data.prospectors.map((item, index) => {
                                     const colorClasses = getColorClasses(item.rendimiento.color);
+                                    const isExpanded = expandedRows.has(item.prospector.id);
+                                    const pData = prospectosData[item.prospector.id];
                                     return (
-                                        <tr key={item.prospector.id} className={`border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                                        <React.Fragment key={item.prospector.id}>
+                                        <tr className={`border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                                            <td className="px-3 py-4 text-center">
+                                                <button
+                                                    onClick={() => toggleProspectos(item.prospector.id)}
+                                                    className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                                    title={isExpanded ? 'Ocultar prospectos' : 'Ver prospectos'}
+                                                >
+                                                    {isExpanded
+                                                        ? <ChevronDown className="w-4 h-4 text-blue-600" />
+                                                        : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                                                </button>
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div>
                                                     <p className="font-semibold text-gray-900 text-sm">{item.prospector.nombre}</p>
@@ -491,7 +545,16 @@ const CloserMonitoreoProspectors = () => {
                                             </td>
                                             <td className="text-center px-6 py-4 text-purple-600 font-bold">{item.metricas.citas.agendadas}</td>
                                             <td className="text-center px-6 py-4 text-gray-600">{item.metricas.citas.transferidas}</td>
-                                            <td className="text-center px-6 py-4 text-gray-600">{item.metricas.prospectos.total}</td>
+                                            <td className="text-center px-6 py-4">
+                                                <button
+                                                    onClick={() => toggleProspectos(item.prospector.id)}
+                                                    className="font-bold text-gray-900 underline decoration-dotted hover:text-blue-600 transition-colors"
+                                                    title="Ver prospectos"
+                                                >
+                                                    {item.metricas.prospectos.nuevos}
+                                                </button>
+                                                <span className="text-gray-400 text-xs"> / {item.metricas.prospectos.total}</span>
+                                            </td>
                                             <td className="text-center px-6 py-4">
                                                 <div className={`inline-flex items-center gap-1 px-2 py-1 ${colorClasses.badge} rounded-lg`}>
                                                     {getEstadoIcon(item.rendimiento.estado)}
@@ -507,6 +570,53 @@ const CloserMonitoreoProspectors = () => {
                                                 </button>
                                             </td>
                                         </tr>
+                                        {isExpanded && (
+                                            <tr className="border-b border-blue-100">
+                                                <td colSpan={10} className="bg-blue-50 px-6 py-4">
+                                                    <p className="text-xs font-bold text-blue-700 mb-3 flex items-center gap-1">
+                                                        <Users className="w-3 h-3" />
+                                                        Prospectos agregados — período {periodo}
+                                                    </p>
+                                                    {pData?.loading ? (
+                                                        <div className="flex items-center gap-2 text-gray-500 text-sm">
+                                                            <RefreshCw className="w-4 h-4 animate-spin" /> Cargando...
+                                                        </div>
+                                                    ) : !pData || pData.prospectos.length === 0 ? (
+                                                        <p className="text-gray-500 text-sm">No hay prospectos en este período.</p>
+                                                    ) : (
+                                                        <table className="w-full text-sm">
+                                                            <thead>
+                                                                <tr className="text-left text-gray-500 text-xs border-b border-blue-200">
+                                                                    <th className="pb-2 pr-4">Nombre</th>
+                                                                    <th className="pb-2 pr-4">Teléfono</th>
+                                                                    <th className="pb-2 pr-4">Correo</th>
+                                                                    <th className="pb-2 pr-4">Empresa</th>
+                                                                    <th className="pb-2 pr-4">Etapa</th>
+                                                                    <th className="pb-2">Fecha Registro</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {pData.prospectos.map((p) => (
+                                                                    <tr key={p.id} className="border-b border-blue-100 hover:bg-blue-100 transition-colors">
+                                                                        <td className="py-2 pr-4 font-medium text-gray-900">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ')}</td>
+                                                                        <td className="py-2 pr-4 text-gray-600">{p.telefono || '—'}</td>
+                                                                        <td className="py-2 pr-4 text-gray-600">{p.correo || '—'}</td>
+                                                                        <td className="py-2 pr-4 text-gray-600">{p.empresa || '—'}</td>
+                                                                        <td className="py-2 pr-4">
+                                                                            <span className="px-2 py-0.5 bg-white border border-blue-200 rounded-full text-xs text-blue-700 font-semibold">
+                                                                                {etapaLabel(p.etapaEmbudo)}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="py-2 text-gray-500">{new Date(p.fechaRegistro).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>

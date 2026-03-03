@@ -188,4 +188,37 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
     }
 });
 
+// GET /api/closer/prospectors/monitoring/:prospectorId/prospectos
+router.get('/monitoring/:prospectorId/prospectos', [auth, esCloserOAdmin], async (req, res) => {
+    try {
+        const { prospectorId } = req.params;
+        const { periodo = 'diario' } = req.query;
+        const ahora = new Date();
+        let fechaInicio = new Date();
+
+        if (periodo === 'diario') {
+            fechaInicio.setHours(0, 0, 0, 0);
+        } else if (periodo === 'semanal') {
+            fechaInicio.setDate(ahora.getDate() - 7);
+            fechaInicio.setHours(0, 0, 0, 0);
+        } else if (periodo === 'mensual') {
+            fechaInicio.setDate(ahora.getDate() - 30);
+            fechaInicio.setHours(0, 0, 0, 0);
+        }
+        const fechaInicioStr = fechaInicio.toISOString();
+
+        const prospectos = await db.prepare(`
+            SELECT id, nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, etapaEmbudo, fechaRegistro
+            FROM clientes
+            WHERE prospectorAsignado = ? AND fechaRegistro >= ?
+            ORDER BY fechaRegistro DESC
+        `).all(parseInt(prospectorId), fechaInicioStr);
+
+        res.json({ prospectos });
+    } catch (error) {
+        console.error('Error al obtener prospectos del prospector:', error);
+        res.status(500).json({ msg: 'Error del servidor' });
+    }
+});
+
 module.exports = router;
