@@ -743,6 +743,28 @@ router.put('/prospectos/:id/editar', [auth, esCloser], async (req, res) => {
     }
 });
 
+// DELETE /api/closer/prospectos/:id
+router.delete('/prospectos/:id', [auth, esCloser], async (req, res) => {
+    try {
+        const prospectoId = parseInt(req.params.id);
+
+        const cliente = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(prospectoId);
+        if (!cliente) {
+            return res.status(404).json({ msg: 'Prospecto no encontrado' });
+        }
+
+        // Eliminar actividades asociadas primero (integridad referencial)
+        await db.prepare('DELETE FROM actividades WHERE cliente = ?').run(prospectoId);
+        // Eliminar el prospecto
+        await db.prepare('DELETE FROM clientes WHERE id = ?').run(prospectoId);
+
+        res.json({ msg: 'Prospecto eliminado correctamente' });
+    } catch (error) {
+        console.error('Error al eliminar prospecto:', error);
+        res.status(500).json({ msg: 'Error del servidor' });
+    }
+});
+
 // POST /api/closer/pasar-a-cliente/:id
 router.post('/pasar-a-cliente/:id', [auth, esCloser], async (req, res) => {
     try {
