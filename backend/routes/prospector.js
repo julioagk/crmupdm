@@ -252,8 +252,8 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
         const now = new Date().toISOString();
 
         const stmt = await db.prepare(`
-            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas, sitioWeb, ubicacion, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo')
+            INSERT INTO clientes (nombres, apellidoPaterno, apellidoMaterno, telefono, telefono2, correo, empresa, notas, sitioWeb, ubicacion, vendedorAsignado, prospectorAsignado, closerAsignado, etapaEmbudo, fechaRegistro, fechaUltimaEtapa)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prospecto_nuevo', ?, ?)
         `);
         const result = await stmt.run(
             (nombres || '').trim(),
@@ -268,7 +268,9 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
             (ubicacion || '').trim(),
             prospectorId,
             prospectorId,
-            closerId
+            closerId,
+            now,
+            now
         );
 
         const row = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(result.lastInsertRowid);
