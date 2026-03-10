@@ -29,7 +29,7 @@ router.get('/dashboard', [auth, esProspector], async (req, res) => {
         };
 
         const { rows: actividadesHoy } = await pool.query(
-            `SELECT * FROM actividades WHERE vendedor = $1 AND DATE(fecha AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE`,
+            `SELECT * FROM actividades WHERE vendedor = $1 AND DATE(fecha::timestamptz AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE`,
             [prospectorId]
         );
 
@@ -342,7 +342,7 @@ router.get('/actividades-hoy', [auth, esProspector], async (req, res) => {
             `SELECT a.*, c.nombres as c_nombres, c."apellidoPaterno" as c_apellidopaterno, c.empresa as c_empresa, c.telefono as c_telefono, c.correo as c_correo
              FROM actividades a
              JOIN clientes c ON a.cliente = c.id
-             WHERE a.vendedor = $1 AND DATE(a.fecha AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE
+             WHERE a.vendedor = $1 AND DATE(a.fecha::timestamptz AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE
              ORDER BY a.fecha DESC`,
             [prospectorId]
         );
@@ -378,7 +378,7 @@ router.get('/actividades', [auth, esProspector], async (req, res) => {
         } else if (rango === 'mes') {
             condicionFecha = "a.fecha >= NOW() - INTERVAL '29 days'";
         } else {
-            condicionFecha = "DATE(a.fecha AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE";
+            condicionFecha = "DATE(a.fecha::timestamptz AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE";
         }
 
         const { rows } = await pool.query(
