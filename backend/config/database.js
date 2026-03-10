@@ -255,79 +255,102 @@ const initDb = async () => {
       await internalDb.query(`
         DO $$ BEGIN
           -- usuarios
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fechacreacion') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fechacreacion')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fechaCreacion') THEN
             ALTER TABLE usuarios RENAME COLUMN fechacreacion TO "fechaCreacion";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googlerefreshtoken') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googlerefreshtoken')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googleRefreshToken') THEN
             ALTER TABLE usuarios RENAME COLUMN googlerefreshtoken TO "googleRefreshToken";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googleaccesstoken') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googleaccesstoken')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googleAccessToken') THEN
             ALTER TABLE usuarios RENAME COLUMN googleaccesstoken TO "googleAccessToken";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googletokenexpiry') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googletokenexpiry')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googleTokenExpiry') THEN
             ALTER TABLE usuarios RENAME COLUMN googletokenexpiry TO "googleTokenExpiry";
           END IF;
 
           -- clientes
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidopaterno') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidopaterno')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidoPaterno') THEN
             ALTER TABLE clientes RENAME COLUMN apellidopaterno TO "apellidoPaterno";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidomaterno') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidomaterno')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidoMaterno') THEN
             ALTER TABLE clientes RENAME COLUMN apellidomaterno TO "apellidoMaterno";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='etapaembudo') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='etapaembudo')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='etapaEmbudo') THEN
             ALTER TABLE clientes RENAME COLUMN etapaembudo TO "etapaEmbudo";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='prospectorasignado') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='prospectorasignado')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='prospectorAsignado') THEN
             ALTER TABLE clientes RENAME COLUMN prospectorasignado TO "prospectorAsignado";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='closerasignado') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='closerasignado')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='closerAsignado') THEN
             ALTER TABLE clientes RENAME COLUMN closerasignado TO "closerAsignado";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechatransferencia') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechatransferencia')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaTransferencia') THEN
             ALTER TABLE clientes RENAME COLUMN fechatransferencia TO "fechaTransferencia";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaultimaetapa') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaultimaetapa')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaUltimaEtapa') THEN
             ALTER TABLE clientes RENAME COLUMN fechaultimaetapa TO "fechaUltimaEtapa";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='historialembudo') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='historialembudo')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='historialEmbudo') THEN
             ALTER TABLE clientes RENAME COLUMN historialembudo TO "historialEmbudo";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='vendedorasignado') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='vendedorasignado')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='vendedorAsignado') THEN
             ALTER TABLE clientes RENAME COLUMN vendedorasignado TO "vendedorAsignado";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegristro') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegristro')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaRegistro') THEN
             ALTER TABLE clientes RENAME COLUMN fecharegristro TO "fechaRegistro";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegistro') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegistro')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaRegistro') THEN
             ALTER TABLE clientes RENAME COLUMN fecharegistro TO "fechaRegistro";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='ultimainteraccion') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='ultimainteraccion')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='ultimaInteraccion') THEN
             ALTER TABLE clientes RENAME COLUMN ultimainteraccion TO "ultimaInteraccion";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='sitioweb') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='sitioweb')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='sitioWeb') THEN
             ALTER TABLE clientes RENAME COLUMN sitioweb TO "sitioWeb";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='proximallamada') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='proximallamada')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='proximaLlamada') THEN
             ALTER TABLE clientes RENAME COLUMN proximallamada TO "proximaLlamada";
           END IF;
 
           -- actividades
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='cambioetapa') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='cambioetapa')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='cambioEtapa') THEN
             ALTER TABLE actividades RENAME COLUMN cambioetapa TO "cambioEtapa";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapaanterior') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapaanterior')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapaAnterior') THEN
             ALTER TABLE actividades RENAME COLUMN etapaanterior TO "etapaAnterior";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapanueva') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapanueva')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapaNueva') THEN
             ALTER TABLE actividades RENAME COLUMN etapanueva TO "etapaNueva";
           END IF;
 
           -- tareas
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechalimite') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechalimite')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechaLimite') THEN
             ALTER TABLE tareas RENAME COLUMN fechalimite TO "fechaLimite";
           END IF;
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechacreacion') THEN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechacreacion')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechaCreacion') THEN
             ALTER TABLE tareas RENAME COLUMN fechacreacion TO "fechaCreacion";
           END IF;
         END $$;
