@@ -639,7 +639,7 @@ const CloserMonitoreoProspectors = () => {
                                                 <ul className="divide-y divide-gray-50 max-h-36 overflow-y-auto">
                                                     {pData.prospectos.map((p) => (
                                                         <li key={p.id} className="px-3 py-1.5 hover:bg-gray-50">
-                                                            <p className="font-semibold text-gray-900 text-[11px]">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ')}</p>
+                                                            <p className="font-semibold text-gray-900 text-[11px]">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'}</p>
                                                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                                                 {p.telefono && <span className="text-gray-400 text-[10px]">{p.telefono}</span>}
                                                                 <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-semibold">{etapaLabel(p.etapaEmbudo)}</span>
@@ -747,7 +747,7 @@ const CloserMonitoreoProspectors = () => {
                                                                 <tbody>
                                                                     {pData.prospectos.map((p) => (
                                                                         <tr key={p.id} className="border-b border-green-100 hover:bg-green-100/50">
-                                                                            <td className="py-1.5 pr-4 font-medium text-gray-800">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ')}</td>
+                                                                            <td className="py-1.5 pr-4 font-medium text-gray-800">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'}</td>
                                                                             <td className="py-1.5 pr-4 text-gray-500">{p.telefono || '—'}</td>
                                                                             <td className="py-1.5 pr-4 text-gray-500">{p.correo || '—'}</td>
                                                                             <td className="py-1.5 pr-4 text-gray-500">{p.empresa || '—'}</td>

@@ -105,7 +105,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Hoy
             const actsHoy = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.correo as correoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -119,7 +119,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // Prospectos registrados HOY
             const prospectosHoyRaw = await db.prepare(`
-                SELECT id, nombres, apellidoPaterno, etapaEmbudo, closerAsignado, fechaRegistro
+                SELECT id, nombres, apellidoPaterno, correo, etapaEmbudo, closerAsignado, fechaRegistro
                 FROM clientes 
                 WHERE prospectorAsignado = ? 
                 AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))
@@ -133,7 +133,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             // Add a computed 'nombre' field for convenience in the timeline
             const prospectosHoyConNombre = prospectosHoyRaw.map(p => ({
                 ...p,
-                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || 'Sin nombre'
+                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'
             }));
 
             const rendimientoHoy = calcularEstado(llamadasHoy.length, citasHoy, 'diario');
@@ -146,14 +146,14 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 descripcion: a.descripcion || null,
                 resultado: a.resultado || null,
                 notas: a.notas || null,
-                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || null,
+                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || a.correoCliente || null,
             }));
 
             const timelineProspectos = prospectosHoyConNombre.map(p => ({
                 tipo: 'prospecto_registrado',
                 subTipo: 'registro',
                 fecha: p.fechaRegistro || null,
-                nombre: p.nombre || null,
+                nombre: p.nombre || p.correo || null,
                 etapa: p.etapaEmbudo || null,
             }));
 
@@ -178,7 +178,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Semana — with JOIN for names
             const actsSemana = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.correo as correoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -191,7 +191,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const citasSemana = row10.c;
 
             const prospectosSemanaRaw = await db.prepare(`
-                SELECT id, nombres, apellidoPaterno, etapaEmbudo, closerAsignado, fechaRegistro
+                SELECT id, nombres, apellidoPaterno, correo, etapaEmbudo, closerAsignado, fechaRegistro
                 FROM clientes 
                 WHERE prospectorAsignado = ? 
                 AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))
@@ -204,7 +204,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             const prospectosSemanaConNombre = prospectosSemanaRaw.map(p => ({
                 ...p,
-                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || 'Sin nombre'
+                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'
             }));
 
             const rendimientoSemana = calcularEstado(llamadasSemana.length, citasSemana, 'semanal');
@@ -217,13 +217,13 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 descripcion: a.descripcion || null,
                 resultado: a.resultado || null,
                 notas: a.notas || null,
-                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || null,
+                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || a.correoCliente || null,
             }));
             const timelineProspectosSemana = prospectosSemanaConNombre.map(p => ({
                 tipo: 'prospecto_registrado',
                 subTipo: 'registro',
                 fecha: p.fechaRegistro || null,
-                nombre: p.nombre || null,
+                nombre: p.nombre || p.correo || null,
                 etapa: p.etapaEmbudo || null,
             }));
             const actividadesTimelineSemana = [...timelineActsSemana, ...timelineProspectosSemana]
@@ -232,7 +232,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // Timeline for "todo" (last 200 activities, no date filter)
             const actsTodo = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.correo as correoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ?
@@ -246,7 +246,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 descripcion: a.descripcion || null,
                 resultado: a.resultado || null,
                 notas: a.notas || null,
-                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || null,
+                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || a.correoCliente || null,
             })).filter(e => e.fecha);
 
             const detalleSemana = {
