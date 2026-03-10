@@ -102,6 +102,30 @@ export default function TimeWheelPicker({ value, onChange, dateClassName = '', d
         }
         setMInput(null);
     };
+    const handleHourInput = (val) => {
+        const digits = val.replace(/\D/g, '').slice(0, 2);
+        setHInput(digits);
+        const parsed = parseInt(digits, 10);
+        if (digits.length === 2) {
+            if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) updateTime(to24h(parsed, ampm), minute);
+            setHInput(null);
+            setMInput('');
+        } else if (digits.length === 1 && parsed >= 2) {
+            // digit 2-9: only valid as single-digit hour, jump to minutes
+            updateTime(to24h(parsed, ampm), minute);
+            setHInput(null);
+            setMInput('');
+        }
+    };
+    const handleMinuteInput = (val) => {
+        const digits = val.replace(/\D/g, '').slice(0, 2);
+        setMInput(digits);
+        if (digits.length === 2) {
+            const parsed = parseInt(digits, 10);
+            if (!isNaN(parsed) && parsed >= 0 && parsed <= 59) updateTime(hour24, parsed);
+            setMInput(null);
+        }
+    };
 
     const inputClass = "bg-transparent outline-none text-blue-600 font-black tabular-nums text-center leading-none";
 
@@ -119,17 +143,18 @@ export default function TimeWheelPicker({ value, onChange, dateClassName = '', d
                         {hInput !== null ? (
                             <input
                                 autoFocus
-                                type="number" min="1" max="12"
+                                type="text" inputMode="numeric"
                                 value={hInput}
-                                onChange={e => setHInput(e.target.value)}
+                                placeholder={String(h12).padStart(2, '0')}
+                                onChange={e => handleHourInput(e.target.value)}
                                 onBlur={() => commitHour(hInput)}
-                                onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); commitHour(hInput); } if (e.key === 'Escape') setHInput(null); }}
-                                className={`${inputClass} w-[2ch] text-3xl [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitHour(hInput); } if (e.key === 'Escape') setHInput(null); }}
+                                className={`${inputClass} w-[2ch] text-3xl`}
                             />
                         ) : (
                             <span className="cursor-text hover:bg-blue-50 rounded px-0.5 transition-colors"
                                 title="Clic para editar hora"
-                                onClick={() => setHInput(String(h12))}>
+                                onClick={() => setHInput('')}>
                                 {String(h12).padStart(2, '0')}
                             </span>
                         )}
@@ -138,17 +163,18 @@ export default function TimeWheelPicker({ value, onChange, dateClassName = '', d
                         {mInput !== null ? (
                             <input
                                 autoFocus
-                                type="number" min="0" max="59"
+                                type="text" inputMode="numeric"
                                 value={mInput}
-                                onChange={e => setMInput(e.target.value)}
+                                placeholder={String(minute).padStart(2, '0')}
+                                onChange={e => handleMinuteInput(e.target.value)}
                                 onBlur={() => commitMinute(mInput)}
-                                onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); commitMinute(mInput); } if (e.key === 'Escape') setMInput(null); }}
-                                className={`${inputClass} w-[2ch] text-3xl [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitMinute(mInput); } if (e.key === 'Escape') setMInput(null); }}
+                                className={`${inputClass} w-[2ch] text-3xl`}
                             />
                         ) : (
                             <span className="cursor-text hover:bg-blue-50 rounded px-0.5 transition-colors"
                                 title="Clic para editar minutos"
-                                onClick={() => setMInput(String(minute))}>
+                                onClick={() => setMInput('')}>
                                 {String(minute).padStart(2, '0')}
                             </span>
                         )}

@@ -1237,7 +1237,7 @@ const ProspectorSeguimiento = () => {
                                             <button
                                                 key={value}
                                                 type="button"
-                                                onClick={() => actualizarInteres(pid, value)}
+                                                onClick={() => actualizarInteres(pid, prospectoSeleccionado.interes === value ? 0 : value)}
                                                 className="hover:scale-110 transition-transform"
                                             >
                                                 <Star className={`w-6 h-6 ${prospectoSeleccionado.interes >= value ? 'fill-yellow-400' : 'fill-slate-100 text-slate-300'}`} />
