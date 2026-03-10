@@ -245,88 +245,19 @@ const initDb = async () => {
     console.error('❌ Error al inicializar o seedear DB:', e.message);
   }
 
-  // Migración: rellenar etapaEmbudo NULL con 'prospecto_nuevo'
-  try {
-    await db.exec("UPDATE clientes SET etapaEmbudo = 'prospecto_nuevo' WHERE etapaEmbudo IS NULL");
-    console.log('✅ Migración etapaEmbudo completada');
-  } catch (e) {
-    console.error('⚠️ Migración etapaEmbudo falló (no crítico):', e.message);
-  }
-
-  // Migración: agregar columna ubicacion si no existe
-  try {
-    if (isPostgres) {
-      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS ubicacion TEXT');
-    } else {
-      internalDb.prepare('ALTER TABLE clientes ADD COLUMN ubicacion TEXT').run();
-    }
-    console.log('✅ Migración ubicacion completada');
-  } catch (e) {
-    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
-      console.error('⚠️ Migración ubicacion falló (no crítico):', e.message);
-    }
-  }
-  try {
-    if (isPostgres) {
-      // Renombrar si existe en lowercase, luego agregar si no existe
-      await internalDb.query(`
-        DO $$ BEGIN
-          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='sitioweb') THEN
-            ALTER TABLE clientes RENAME COLUMN sitioweb TO "sitioWeb";
-          END IF;
-        END $$;
-      `);
-      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "sitioWeb" TEXT');
-    } else {
-      internalDb.prepare('ALTER TABLE clientes ADD COLUMN sitioWeb TEXT').run();
-    }
-    console.log('✅ Migración sitioWeb completada');
-  } catch (e) {
-    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
-      console.error('⚠️ Migración sitioWeb falló (no crítico):', e.message);
-    }
-  }
-  try {
-    if (isPostgres) {
-      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS telefono2 TEXT');
-    } else {
-      internalDb.prepare('ALTER TABLE clientes ADD COLUMN telefono2 TEXT').run();
-    }
-    console.log('✅ Migración telefono2 completada');
-  } catch (e) {
-    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
-      console.error('⚠️ Migración telefono2 falló (no crítico):', e.message);
-    }
-  }
-  try {
-    if (isPostgres) {
-      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "proximaLlamada" TIMESTAMPTZ');
-    } else {
-      internalDb.prepare('ALTER TABLE clientes ADD COLUMN proximaLlamada TEXT').run();
-    }
-    console.log('✅ Migración proximaLlamada completada');
-  } catch (e) {
-    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
-      console.error('⚠️ Migración proximaLlamada falló (no crítico):', e.message);
-    }
-  }
-  try {
-    if (isPostgres) {
-      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS interes TEXT');
-    } else {
-      internalDb.prepare('ALTER TABLE clientes ADD COLUMN interes TEXT').run();
-    }
-    console.log('✅ Migración interes completada');
-  } catch (e) {
-    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
-      console.error('⚠️ Migración interes falló (no crítico):', e.message);
-    }
-  }
-  // Migración: renombrar columnas google de lowercase a camelCase en usuarios
+  // ================================================================
+  // MIGRACIÓN POSTGRESQL: normalizar TODAS las columnas camelCase
+  // Renombra cualquier columna que exista en lowercase a su versión
+  // con comillas dobles, y agrega las columnas que falten.
+  // ================================================================
   if (isPostgres) {
     try {
       await internalDb.query(`
         DO $$ BEGIN
+          -- usuarios
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fechacreacion') THEN
+            ALTER TABLE usuarios RENAME COLUMN fechacreacion TO "fechaCreacion";
+          END IF;
           IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googlerefreshtoken') THEN
             ALTER TABLE usuarios RENAME COLUMN googlerefreshtoken TO "googleRefreshToken";
           END IF;
@@ -336,16 +267,128 @@ const initDb = async () => {
           IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googletokenexpiry') THEN
             ALTER TABLE usuarios RENAME COLUMN googletokenexpiry TO "googleTokenExpiry";
           END IF;
+
+          -- clientes
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidopaterno') THEN
+            ALTER TABLE clientes RENAME COLUMN apellidopaterno TO "apellidoPaterno";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidomaterno') THEN
+            ALTER TABLE clientes RENAME COLUMN apellidomaterno TO "apellidoMaterno";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='etapaembudo') THEN
+            ALTER TABLE clientes RENAME COLUMN etapaembudo TO "etapaEmbudo";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='prospectorasignado') THEN
+            ALTER TABLE clientes RENAME COLUMN prospectorasignado TO "prospectorAsignado";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='closerasignado') THEN
+            ALTER TABLE clientes RENAME COLUMN closerasignado TO "closerAsignado";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechatransferencia') THEN
+            ALTER TABLE clientes RENAME COLUMN fechatransferencia TO "fechaTransferencia";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaultimaetapa') THEN
+            ALTER TABLE clientes RENAME COLUMN fechaultimaetapa TO "fechaUltimaEtapa";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='historialembudo') THEN
+            ALTER TABLE clientes RENAME COLUMN historialembudo TO "historialEmbudo";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='vendedorasignado') THEN
+            ALTER TABLE clientes RENAME COLUMN vendedorasignado TO "vendedorAsignado";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegristro') THEN
+            ALTER TABLE clientes RENAME COLUMN fecharegristro TO "fechaRegistro";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegistro') THEN
+            ALTER TABLE clientes RENAME COLUMN fecharegistro TO "fechaRegistro";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='ultimainteraccion') THEN
+            ALTER TABLE clientes RENAME COLUMN ultimainteraccion TO "ultimaInteraccion";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='sitioweb') THEN
+            ALTER TABLE clientes RENAME COLUMN sitioweb TO "sitioWeb";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='proximallamada') THEN
+            ALTER TABLE clientes RENAME COLUMN proximallamada TO "proximaLlamada";
+          END IF;
+
+          -- actividades
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='cambioetapa') THEN
+            ALTER TABLE actividades RENAME COLUMN cambioetapa TO "cambioEtapa";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapaanterior') THEN
+            ALTER TABLE actividades RENAME COLUMN etapaanterior TO "etapaAnterior";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapanueva') THEN
+            ALTER TABLE actividades RENAME COLUMN etapanueva TO "etapaNueva";
+          END IF;
+
+          -- tareas
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechalimite') THEN
+            ALTER TABLE tareas RENAME COLUMN fechalimite TO "fechaLimite";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechacreacion') THEN
+            ALTER TABLE tareas RENAME COLUMN fechacreacion TO "fechaCreacion";
+          END IF;
         END $$;
       `);
-      // Agregar columnas si aún no existen (DB limpia)
-      await internalDb.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS "googleRefreshToken" TEXT');
-      await internalDb.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS "googleAccessToken" TEXT');
-      await internalDb.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS "googleTokenExpiry" TIMESTAMPTZ');
-      console.log('✅ Migración columnas google en usuarios completada');
+      console.log('✅ Migración: renombrado de columnas a camelCase completado');
     } catch (e) {
-      console.error('⚠️ Migración google columns falló (no crítico):', e.message);
+      console.error('⚠️ Migración renombrado columnas falló:', e.message);
     }
+
+    // Agregar columnas que pueden faltar en DBs antiguas
+    const colsMissingPg = [
+      ['usuarios',  '"googleRefreshToken"', 'TEXT'],
+      ['usuarios',  '"googleAccessToken"',  'TEXT'],
+      ['usuarios',  '"googleTokenExpiry"',  'TIMESTAMPTZ'],
+      ['clientes',  'ubicacion',            'TEXT'],
+      ['clientes',  '"sitioWeb"',           'TEXT'],
+      ['clientes',  'telefono2',            'TEXT'],
+      ['clientes',  '"proximaLlamada"',     'TIMESTAMPTZ'],
+      ['clientes',  'interes',              'TEXT'],
+    ];
+    for (const [table, col, type] of colsMissingPg) {
+      try {
+        await internalDb.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+      } catch (e) {
+        if (!e.message.includes('already exists')) {
+          console.error(`⚠️ Error agregando ${col} a ${table}:`, e.message);
+        }
+      }
+    }
+    console.log('✅ Migración: columnas faltantes verificadas');
+
+    // Rellenar etapaEmbudo NULL
+    try {
+      await internalDb.query(`UPDATE clientes SET "etapaEmbudo" = 'prospecto_nuevo' WHERE "etapaEmbudo" IS NULL`);
+    } catch (e) {
+      console.error('⚠️ Migración etapaEmbudo falló:', e.message);
+    }
+  } else {
+    // SQLite: agregar columnas faltantes
+    const colsMissingSqlite = [
+      ['clientes', 'ubicacion TEXT'],
+      ['clientes', 'sitioWeb TEXT'],
+      ['clientes', 'telefono2 TEXT'],
+      ['clientes', 'proximaLlamada TEXT'],
+      ['clientes', 'interes TEXT'],
+      ['usuarios', 'googleRefreshToken TEXT'],
+      ['usuarios', 'googleAccessToken TEXT'],
+      ['usuarios', 'googleTokenExpiry REAL'],
+    ];
+    for (const [table, colDef] of colsMissingSqlite) {
+      try {
+        internalDb.prepare(`ALTER TABLE ${table} ADD COLUMN ${colDef}`).run();
+      } catch (e) {
+        if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
+          console.error(`⚠️ SQLite: error agregando ${colDef} a ${table}:`, e.message);
+        }
+      }
+    }
+    try {
+      internalDb.prepare(`UPDATE clientes SET etapaEmbudo = 'prospecto_nuevo' WHERE etapaEmbudo IS NULL`).run();
+    } catch (e) { /* ignorar */ }
   }
 };
 
