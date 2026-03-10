@@ -1835,9 +1835,9 @@ const ProspectorSeguimiento = () => {
                                                         {p.nombres} {p.apellidoPaterno}
                                                     </p>
                                                     <div className="flex items-center gap-0.5 text-yellow-500 scale-75 origin-left mt-0.5">
-                                                        <Star className={`w-3.5 h-3.5 ${p.interes >= 1 ? 'fill-yellow-400' : 'fill-slate-100 text-slate-300'}`} />
-                                                        <Star className={`w-3.5 h-3.5 ${p.interes >= 3 ? 'fill-yellow-400' : 'fill-slate-100 text-slate-300'}`} />
-                                                        <Star className={`w-3.5 h-3.5 ${p.interes >= 5 ? 'fill-yellow-400' : 'fill-slate-100 text-slate-300'}`} />
+                                                        {[1, 2, 3, 4, 5].map((value) => (
+                                                            <Star key={value} className={`w-3.5 h-3.5 ${p.interes >= value ? 'fill-yellow-400' : 'fill-slate-100 text-slate-300'}`} />
+                                                        ))}
                                                     </div>
                                                 </div>
                                             </td>
