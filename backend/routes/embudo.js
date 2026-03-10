@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const pool = require('../config/database');
 const { auth } = require('../middleware/auth');
 
-router.get('/', auth, (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const etapas = ['prospecto_nuevo', 'en_contacto', 'reunion_agendada', 'reunion_realizada', 'en_negociacion', 'venta_ganada', 'perdido'];
         const conteos = {};
-        etapas.forEach(e => {
-            conteos[e] = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE etapaEmbudo = ?').get(e).c;
-        });
+        await Promise.all(etapas.map(async (e) => {
+            const { rows } = await pool.query('SELECT COUNT(*) as c FROM clientes WHERE "etapaEmbudo" = $1', [e]);
+            conteos[e] = parseInt(rows[0].c);
+        }));
         res.json(conteos);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });

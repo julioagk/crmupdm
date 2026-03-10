@@ -1,17 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const pool = require('../config/database');
 const { auth } = require('../middleware/auth');
 
-router.get('/', auth, (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
-        const hoyInicio = new Date().toISOString().slice(0, 10) + ' 00:00:00';
-        const llamadasHoy = db.prepare('SELECT COUNT(*) as c FROM actividades WHERE tipo = ? AND fecha >= ?').get('llamada', hoyInicio).c;
-        const totalLlamadas = db.prepare('SELECT COUNT(*) as c FROM actividades WHERE tipo = ?').get('llamada').c;
-        const clientesTotal = db.prepare('SELECT COUNT(*) as c FROM clientes').get().c;
+        const hoyInicio = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z';
+        const [r1, r2, r3] = await Promise.all([
+            pool.query('SELECT COUNT(*) as c FROM actividades WHERE tipo = $1 AND fecha >= $2', ['llamada', hoyInicio]),
+            pool.query('SELECT COUNT(*) as c FROM actividades WHERE tipo = $1', ['llamada']),
+            pool.query('SELECT COUNT(*) as c FROM clientes')
+        ]);
         res.json({
-            llamadas: { hoy: llamadasHoy, totales: totalLlamadas },
-            clientes: clientesTotal
+            llamadas: { hoy: parseInt(r1.rows[0].c), totales: parseInt(r2.rows[0].c) },
+            clientes: parseInt(r3.rows[0].c)
         });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });

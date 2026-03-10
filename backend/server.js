@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require('./config/database'); // Inicializa SQLite
+require('./config/database'); // Inicializa PostgreSQL
 
 const app = express();
 

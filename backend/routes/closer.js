@@ -1,11 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const pool = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
 
 const esCloser = (req, res, next) => {
-    if (req.usuario.rol !== 'closer' && req.usuario.rol !== 'admin') {
+    if (req.usuario.rol !== 'closer') {
         return res.status(403).json({ msg: 'Acceso denegado. Solo closers.' });
     }
     next();
@@ -14,7 +14,7 @@ const esCloser = (req, res, next) => {
 router.get('/dashboard', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
-        const clientes = db.prepare('SELECT * FROM clientes WHERE closerAsignado = ?').all(closerId);
+        const { rows: clientes } = await pool.query('SELECT * FROM clientes WHERE "closerAsignado" = $1', [closerId]);
 
         const embudo = {
             total: clientes.length,
@@ -25,16 +25,21 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
             perdido: clientes.filter(c => c.etapaEmbudo === 'perdido').length
         };
 
-        const hoyInicio = new Date().toISOString().slice(0, 10) + ' 00:00:00';
-        const hoyFin = new Date().toISOString().slice(0, 10) + ' 23:59:59';
-        const reunionesHoy = db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND tipo = ? AND fecha >= ? AND fecha <= ?')
-            .all(closerId, 'cita', hoyInicio, hoyFin);
+        const hoyInicio = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z';
+        const hoyFin = new Date().toISOString().slice(0, 10) + 'T23:59:59.999Z';
+        const { rows: reunionesHoy } = await pool.query(
+            'SELECT * FROM actividades WHERE vendedor = $1 AND tipo = $2 AND fecha >= $3 AND fecha <= $4',
+            [closerId, 'cita', hoyInicio, hoyFin]
+        );
 
         const inicioMes = new Date();
         inicioMes.setDate(1);
         inicioMes.setHours(0, 0, 0, 0);
-        const ventasMes = db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ?').all(closerId, inicioMes.toISOString());
-        const montoTotalMes = ventasMes.reduce((sum, v) => sum + (v.monto || 0), 0);
+        const { rows: ventasMes } = await pool.query(
+            'SELECT * FROM ventas WHERE vendedor = $1 AND fecha >= $2',
+            [closerId, inicioMes.toISOString()]
+        );
+        const montoTotalMes = ventasMes.reduce((sum, v) => sum + (parseFloat(v.monto) || 0), 0);
 
         const totalReuniones = embudo.reunion_realizada + embudo.en_negociacion + embudo.venta_ganada + embudo.perdido;
         const tasasConversion = {
@@ -43,6 +48,7 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
             cierre: (embudo.en_negociacion + embudo.venta_ganada) > 0 ? ((embudo.venta_ganada / (embudo.en_negociacion + embudo.venta_ganada)) * 100).toFixed(1) : 0,
             global: embudo.total > 0 ? ((embudo.venta_ganada / embudo.total) * 100).toFixed(1) : 0
         };
+        tasasConversion.interes = tasasConversion.negociacion;
 
         res.json({
             embudo,
@@ -62,16 +68,18 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
 router.get('/calendario', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
-        const rows = db.prepare(`
-            SELECT a.*, c.nombres as c_nombres, c.apellidoPaterno as c_apellido, c.empresa as c_empresa, c.telefono as c_telefono, c.correo as c_correo, c.etapaEmbudo as c_etapa,
+        const { rows } = await pool.query(`
+            SELECT a.*, c.nombres as c_nombres, c."apellidoPaterno" as c_apellido, c.empresa as c_empresa,
+            c.telefono as c_telefono, c.correo as c_correo, c."etapaEmbudo" as c_etapa,
             u.nombre as v_nombre FROM actividades a
             JOIN clientes c ON a.cliente = c.id
             JOIN usuarios u ON a.vendedor = u.id
-            WHERE a.vendedor = ? AND a.tipo = ?
+            WHERE a.vendedor = $1 AND a.tipo = $2
             ORDER BY a.fecha ASC
-        `).all(closerId, 'cita');
+        `, [closerId, 'cita']);
         const reuniones = rows.map(r => ({
             ...toMongoFormat(r),
+            clienteId: r.cliente,
             cliente: { nombres: r.c_nombres, apellidoPaterno: r.c_apellido, empresa: r.c_empresa, telefono: r.c_telefono, correo: r.c_correo, etapaEmbudo: r.c_etapa },
             vendedor: { nombre: r.v_nombre }
         }));
@@ -84,11 +92,11 @@ router.get('/calendario', [auth, esCloser], async (req, res) => {
 router.get('/reuniones-pendientes', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
-        const rows = db.prepare(`
-            SELECT c.*, u.nombre as prospectorNombre FROM clientes c
-            LEFT JOIN usuarios u ON c.prospectorAsignado = u.id
-            WHERE c.closerAsignado = ? AND c.etapaEmbudo = ?
-        `).all(closerId, 'reunion_agendada');
+        const { rows } = await pool.query(`
+            SELECT c.*, u.nombre as "prospectorNombre" FROM clientes c
+            LEFT JOIN usuarios u ON c."prospectorAsignado" = u.id
+            WHERE c."closerAsignado" = $1 AND c."etapaEmbudo" = $2
+        `, [closerId, 'reunion_agendada']);
         const clientes = rows.map(r => {
             const { prospectorNombre, ...c } = r;
             const out = toMongoFormat(c);
@@ -104,12 +112,12 @@ router.get('/reuniones-pendientes', [auth, esCloser], async (req, res) => {
 router.get('/prospectos', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
-        const rows = db.prepare(`
-            SELECT c.*, u.nombre as prospectorNombre FROM clientes c
-            LEFT JOIN usuarios u ON c.prospectorAsignado = u.id
-            WHERE c.closerAsignado = ?
-            ORDER BY c.fechaTransferencia DESC
-        `).all(closerId);
+        const { rows } = await pool.query(`
+            SELECT c.*, u.nombre as "prospectorNombre" FROM clientes c
+            LEFT JOIN usuarios u ON c."prospectorAsignado" = u.id
+            WHERE c."closerAsignado" = $1
+            ORDER BY c."fechaTransferencia" DESC
+        `, [closerId]);
         res.json(rows.map(r => {
             const { prospectorNombre, ...c } = r;
             const out = toMongoFormat(c);
@@ -127,8 +135,9 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
         if (!clienteId || asistio === undefined) return res.status(400).json({ msg: 'Datos requeridos' });
         const cid = parseInt(clienteId);
         const closerId = parseInt(req.usuario.id);
-        const c = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
-        if (!c || c.closerAsignado !== closerId) return res.status(403).json({ msg: 'No autorizado' });
+        const check = await pool.query('SELECT * FROM clientes WHERE id = $1', [cid]);
+        const c = check.rows[0];
+        if (!c || parseInt(c.closerAsignado) !== closerId) return res.status(403).json({ msg: 'No autorizado' });
 
         const etapaNueva = asistio ? (resultado === 'venta' ? 'venta_ganada' : resultado === 'negociacion' ? 'en_negociacion' : 'reunion_realizada') : 'perdido';
         const now = new Date().toISOString();
@@ -136,14 +145,17 @@ router.post('/registrar-reunion', [auth, esCloser], async (req, res) => {
         hist.push({ etapa: etapaNueva, fecha: now, vendedor: closerId });
         const estado = etapaNueva === 'venta_ganada' ? 'ganado' : etapaNueva === 'perdido' ? 'perdido' : 'proceso';
 
-        db.prepare('UPDATE clientes SET etapaEmbudo = ?, estado = ?, fechaUltimaEtapa = ?, ultimaInteraccion = ?, historialEmbudo = ? WHERE id = ?')
-            .run(etapaNueva, estado, now, now, JSON.stringify(hist), cid);
+        await pool.query(
+            'UPDATE clientes SET "etapaEmbudo" = $1, estado = $2, "fechaUltimaEtapa" = $3, "ultimaInteraccion" = $4, "historialEmbudo" = $5 WHERE id = $6',
+            [etapaNueva, estado, now, now, JSON.stringify(hist), cid]
+        );
+        await pool.query(
+            'INSERT INTO actividades (tipo, vendedor, cliente, descripcion, resultado, notas) VALUES ($1, $2, $3, $4, $5, $6)',
+            ['cita', closerId, cid, 'Reunión registrada', asistio ? 'exitoso' : 'fallido', notas || '']
+        );
 
-        db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?)')
-            .run('cita', closerId, cid, 'Reunión registrada', asistio ? 'exitoso' : 'fallido', notas || '');
-
-        const row = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
-        res.json({ msg: 'Reunión registrada', cliente: toMongoFormat(row) || row });
+        const { rows } = await pool.query('SELECT * FROM clientes WHERE id = $1', [cid]);
+        res.json({ msg: 'Reunión registrada', cliente: toMongoFormat(rows[0]) || rows[0] });
     } catch (error) {
         res.status(500).json({ msg: 'Error del servidor' });
     }

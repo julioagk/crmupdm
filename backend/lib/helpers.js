@@ -6,3 +6,5 @@ const toMongoFormat = (row) => {
 };
 
 const toMongoFormatMany = (rows) => (rows || []).map(toMongoFormat);
+
+module.exports = { toMongoFormat, toMongoFormatMany };

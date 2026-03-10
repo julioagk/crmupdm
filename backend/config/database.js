@@ -1,91 +1,168 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { Pool } = require('pg');
 
-const dbPath = process.env.SQLITE_PATH || path.join(__dirname, '..', 'database.db');
-const db = new Database(dbPath);
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
-// Habilitar foreign keys
-db.pragma('journal_mode = WAL');
+async function initDB() {
+    const client = await pool.connect();
+    try {
+        // Crear tablas (cada una por separado)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                usuario TEXT UNIQUE NOT NULL,
+                "contraseña" TEXT NOT NULL,
+                rol TEXT NOT NULL CHECK(rol IN ('prospector','closer')),
+                nombre TEXT NOT NULL,
+                email TEXT,
+                telefono TEXT,
+                activo INTEGER DEFAULT 1,
+                "fechaCreacion" TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS clientes (
+                id SERIAL PRIMARY KEY,
+                nombres TEXT NOT NULL,
+                "apellidoPaterno" TEXT NOT NULL,
+                "apellidoMaterno" TEXT,
+                telefono TEXT NOT NULL,
+                correo TEXT NOT NULL,
+                empresa TEXT,
+                estado TEXT DEFAULT 'proceso',
+                "etapaEmbudo" TEXT DEFAULT 'prospecto_nuevo',
+                "prospectorAsignado" INTEGER REFERENCES usuarios(id),
+                "closerAsignado" INTEGER REFERENCES usuarios(id),
+                "fechaTransferencia" TIMESTAMPTZ,
+                "fechaUltimaEtapa" TIMESTAMPTZ DEFAULT NOW(),
+                "historialEmbudo" TEXT,
+                "vendedorAsignado" INTEGER REFERENCES usuarios(id),
+                "fechaRegistro" TIMESTAMPTZ DEFAULT NOW(),
+                "ultimaInteraccion" TIMESTAMPTZ DEFAULT NOW(),
+                notas TEXT
+            )
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS actividades (
+                id SERIAL PRIMARY KEY,
+                tipo TEXT NOT NULL,
+                vendedor INTEGER NOT NULL REFERENCES usuarios(id),
+                cliente INTEGER NOT NULL REFERENCES clientes(id),
+                fecha TIMESTAMPTZ DEFAULT NOW(),
+                descripcion TEXT,
+                resultado TEXT DEFAULT 'pendiente',
+                "cambioEtapa" INTEGER DEFAULT 0,
+                "etapaAnterior" TEXT,
+                "etapaNueva" TEXT,
+                notas TEXT
+            )
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS tareas (
+                id SERIAL PRIMARY KEY,
+                titulo TEXT NOT NULL,
+                descripcion TEXT,
+                vendedor INTEGER REFERENCES usuarios(id),
+                cliente INTEGER REFERENCES clientes(id),
+                estado TEXT DEFAULT 'pendiente',
+                prioridad TEXT DEFAULT 'media',
+                "fechaLimite" TIMESTAMPTZ,
+                completada INTEGER DEFAULT 0,
+                "fechaCreacion" TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS ventas (
+                id SERIAL PRIMARY KEY,
+                cliente INTEGER NOT NULL REFERENCES clientes(id),
+                vendedor INTEGER NOT NULL REFERENCES usuarios(id),
+                monto NUMERIC NOT NULL,
+                fecha TIMESTAMPTZ DEFAULT NOW(),
+                estado TEXT DEFAULT 'pendiente',
+                notas TEXT
+            )
+        `);
 
-// Crear tablas
-db.exec(`
-  CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario TEXT UNIQUE NOT NULL,
-    contraseña TEXT NOT NULL,
-    rol TEXT NOT NULL CHECK(rol IN ('admin','vendedor','prospector','closer')),
-    nombre TEXT NOT NULL,
-    email TEXT,
-    telefono TEXT,
-    activo INTEGER DEFAULT 1,
-    fechaCreacion TEXT DEFAULT (datetime('now'))
-  );
+        // Migración: renombrar columnas lowercase → camelCase (si existen en lowercase)
+        await client.query(`
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fechacreacion') THEN
+                    ALTER TABLE usuarios RENAME COLUMN fechacreacion TO "fechaCreacion";
+                END IF;
 
-  CREATE TABLE IF NOT EXISTS clientes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombres TEXT NOT NULL,
-    apellidoPaterno TEXT NOT NULL,
-    apellidoMaterno TEXT,
-    telefono TEXT NOT NULL,
-    correo TEXT NOT NULL,
-    empresa TEXT,
-    estado TEXT DEFAULT 'proceso' CHECK(estado IN ('ganado','perdido','proceso')),
-    etapaEmbudo TEXT DEFAULT 'prospecto_nuevo',
-    prospectorAsignado INTEGER REFERENCES usuarios(id),
-    closerAsignado INTEGER REFERENCES usuarios(id),
-    fechaTransferencia TEXT,
-    fechaUltimaEtapa TEXT DEFAULT (datetime('now')),
-    historialEmbudo TEXT,
-    vendedorAsignado INTEGER NOT NULL REFERENCES usuarios(id),
-    fechaRegistro TEXT DEFAULT (datetime('now')),
-    ultimaInteraccion TEXT DEFAULT (datetime('now')),
-    notas TEXT
-  );
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidopaterno') THEN
+                    ALTER TABLE clientes RENAME COLUMN apellidopaterno TO "apellidoPaterno";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='apellidomaterno') THEN
+                    ALTER TABLE clientes RENAME COLUMN apellidomaterno TO "apellidoMaterno";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='etapaembudo') THEN
+                    ALTER TABLE clientes RENAME COLUMN etapaembudo TO "etapaEmbudo";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='prospectorasignado') THEN
+                    ALTER TABLE clientes RENAME COLUMN prospectorasignado TO "prospectorAsignado";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='closerasignado') THEN
+                    ALTER TABLE clientes RENAME COLUMN closerasignado TO "closerAsignado";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechatransferencia') THEN
+                    ALTER TABLE clientes RENAME COLUMN fechatransferencia TO "fechaTransferencia";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fechaultimaetapa') THEN
+                    ALTER TABLE clientes RENAME COLUMN fechaultimaetapa TO "fechaUltimaEtapa";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='historialembudo') THEN
+                    ALTER TABLE clientes RENAME COLUMN historialembudo TO "historialEmbudo";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='vendedorasignado') THEN
+                    ALTER TABLE clientes RENAME COLUMN vendedorasignado TO "vendedorAsignado";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegristro') THEN
+                    ALTER TABLE clientes RENAME COLUMN fecharegristro TO "fechaRegistro";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='fecharegistro') THEN
+                    ALTER TABLE clientes RENAME COLUMN fecharegistro TO "fechaRegistro";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='ultimainteraccion') THEN
+                    ALTER TABLE clientes RENAME COLUMN ultimainteraccion TO "ultimaInteraccion";
+                END IF;
 
-  CREATE TABLE IF NOT EXISTS actividades (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT NOT NULL CHECK(tipo IN ('llamada','mensaje','correo','whatsapp','cita','prospecto')),
-    vendedor INTEGER NOT NULL REFERENCES usuarios(id),
-    cliente INTEGER NOT NULL REFERENCES clientes(id),
-    fecha TEXT DEFAULT (datetime('now')),
-    descripcion TEXT,
-    resultado TEXT DEFAULT 'pendiente' CHECK(resultado IN ('exitoso','pendiente','fallido')),
-    cambioEtapa INTEGER DEFAULT 0,
-    etapaAnterior TEXT,
-    etapaNueva TEXT,
-    notas TEXT
-  );
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='cambioetapa') THEN
+                    ALTER TABLE actividades RENAME COLUMN cambioetapa TO "cambioEtapa";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapaanterior') THEN
+                    ALTER TABLE actividades RENAME COLUMN etapaanterior TO "etapaAnterior";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='actividades' AND column_name='etapanueva') THEN
+                    ALTER TABLE actividades RENAME COLUMN etapanueva TO "etapaNueva";
+                END IF;
 
-  CREATE TABLE IF NOT EXISTS tareas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    titulo TEXT NOT NULL,
-    descripcion TEXT,
-    vendedor INTEGER REFERENCES usuarios(id),
-    cliente INTEGER REFERENCES clientes(id),
-    estado TEXT DEFAULT 'pendiente',
-    prioridad TEXT DEFAULT 'media',
-    fechaLimite TEXT,
-    completada INTEGER DEFAULT 0,
-    fechaCreacion TEXT DEFAULT (datetime('now'))
-  );
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechalimite') THEN
+                    ALTER TABLE tareas RENAME COLUMN fechalimite TO "fechaLimite";
+                END IF;
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tareas' AND column_name='fechacreacion') THEN
+                    ALTER TABLE tareas RENAME COLUMN fechacreacion TO "fechaCreacion";
+                END IF;
+            END $$;
+        `);
 
-  CREATE TABLE IF NOT EXISTS ventas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cliente INTEGER NOT NULL REFERENCES clientes(id),
-    vendedor INTEGER NOT NULL REFERENCES usuarios(id),
-    monto REAL NOT NULL,
-    fecha TEXT DEFAULT (datetime('now')),
-    estado TEXT DEFAULT 'pendiente',
-    notas TEXT
-  );
+        // Índices
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_clientes_prospector ON clientes("prospectorAsignado")`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_clientes_vendedor ON clientes("vendedorAsignado")`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_actividades_vendedor ON actividades(vendedor)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_actividades_fecha ON actividades(fecha)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_actividades_cliente ON actividades(cliente)`);
 
-  CREATE INDEX IF NOT EXISTS idx_clientes_prospector ON clientes(prospectorAsignado);
-  CREATE INDEX IF NOT EXISTS idx_clientes_vendedor ON clientes(vendedorAsignado);
-  CREATE INDEX IF NOT EXISTS idx_actividades_vendedor ON actividades(vendedor);
-  CREATE INDEX IF NOT EXISTS idx_actividades_fecha ON actividades(fecha);
-  CREATE INDEX IF NOT EXISTS idx_actividades_cliente ON actividades(cliente);
-`);
+        console.log('✅ PostgreSQL conectado y tablas listas');
+    } catch (err) {
+        console.error('❌ Error inicializando PostgreSQL:', err.message);
+    } finally {
+        client.release();
+    }
+}
 
-console.log('✅ SQLite conectado:', dbPath);
+initDB();
 
-module.exports = db;
+module.exports = pool;

@@ -1,28 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
-const { auth, esVendedor } = require('../middleware/auth');
+const pool = require('../config/database');
+const { auth, esSuperUser } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
 
-router.get('/', auth, esVendedor, async (req, res) => {
+router.get('/', auth, esSuperUser, async (req, res) => {
     try {
-        let sql = `SELECT a.*, v.nombre as vendedorNombre, c.nombres as c_nombres, c.apellidoPaterno as c_apellido, c.empresa as c_empresa
-            FROM actividades a JOIN usuarios v ON a.vendedor = v.id JOIN clientes c ON a.cliente = c.id WHERE 1=1`;
         const params = [];
-        if (req.usuario.rol === 'vendedor') {
-            sql += ' AND a.vendedor = ?';
-            params.push(parseInt(req.usuario.id));
-        }
+        let idx = 1;
+        let sql = `SELECT a.*, v.nombre as "vendedorNombre", c.nombres as c_nombres, c."apellidoPaterno" as c_apellido, c.empresa as c_empresa
+            FROM actividades a JOIN usuarios v ON a.vendedor = v.id JOIN clientes c ON a.cliente = c.id WHERE 1=1`;
+
         if (req.query.tipo) {
-            sql += ' AND a.tipo = ?';
+            sql += ` AND a.tipo = $${idx++}`;
             params.push(req.query.tipo);
         }
         if (req.query.clienteId) {
-            sql += ' AND a.cliente = ?';
+            sql += ` AND a.cliente = $${idx++}`;
             params.push(parseInt(req.query.clienteId));
         }
         sql += ' ORDER BY a.fecha DESC LIMIT 100';
-        const rows = db.prepare(sql).all(...params);
+
+        const { rows } = await pool.query(sql, params);
         const actividades = rows.map(r => ({
             ...toMongoFormat(r),
             vendedor: { nombre: r.vendedorNombre },
@@ -34,45 +33,44 @@ router.get('/', auth, esVendedor, async (req, res) => {
     }
 });
 
-router.post('/', auth, esVendedor, async (req, res) => {
+router.post('/', auth, esSuperUser, async (req, res) => {
     try {
         const { tipo, cliente, descripcion, resultado, notas } = req.body;
         if (!tipo || !cliente) return res.status(400).json({ mensaje: 'Tipo y cliente requeridos' });
-        const c = db.prepare('SELECT * FROM clientes WHERE id = ?').get(parseInt(cliente));
-        if (!c) return res.status(404).json({ mensaje: 'Cliente no encontrado' });
-        if (req.usuario.rol === 'vendedor' && c.vendedorAsignado !== parseInt(req.usuario.id)) {
-            return res.status(403).json({ mensaje: 'No tiene permiso' });
-        }
+        const check = await pool.query('SELECT id FROM clientes WHERE id = $1', [parseInt(cliente)]);
+        if (!check.rows[0]) return res.status(404).json({ mensaje: 'Cliente no encontrado' });
         const now = new Date().toISOString();
-        db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(tipo, parseInt(req.usuario.id), parseInt(cliente), descripcion || '', resultado || 'pendiente', notas || '');
-        db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, parseInt(cliente));
-        const row = db.prepare('SELECT * FROM actividades ORDER BY id DESC LIMIT 1').get();
-        res.status(201).json({ mensaje: 'Actividad registrada', actividad: toMongoFormat(row) || row });
+        const { rows } = await pool.query(
+            'INSERT INTO actividades (tipo, vendedor, cliente, descripcion, resultado, notas) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [tipo, parseInt(req.usuario.id), parseInt(cliente), descripcion || '', resultado || 'pendiente', notas || '']
+        );
+        await pool.query('UPDATE clientes SET "ultimaInteraccion" = $1 WHERE id = $2', [now, parseInt(cliente)]);
+        res.status(201).json({ mensaje: 'Actividad registrada', actividad: toMongoFormat(rows[0]) || rows[0] });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });
     }
 });
 
-router.put('/:id', auth, esVendedor, async (req, res) => {
+router.put('/:id', auth, esSuperUser, async (req, res) => {
     try {
-        const a = db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
-        if (!a) return res.status(404).json({ mensaje: 'Actividad no encontrada' });
-        if (req.usuario.rol === 'vendedor' && a.vendedor !== parseInt(req.usuario.id)) {
-            return res.status(403).json({ mensaje: 'No tiene permiso' });
-        }
+        const check = await pool.query('SELECT * FROM actividades WHERE id = $1', [parseInt(req.params.id)]);
+        if (!check.rows[0]) return res.status(404).json({ mensaje: 'Actividad no encontrada' });
+
         const { descripcion, resultado, notas } = req.body;
-        const updates = [];
+        const sets = [];
         const params = [];
-        if (descripcion !== undefined) { updates.push('descripcion = ?'); params.push(descripcion); }
-        if (resultado) { updates.push('resultado = ?'); params.push(resultado); }
-        if (notas !== undefined) { updates.push('notas = ?'); params.push(notas); }
-        if (updates.length) {
+        let idx = 1;
+
+        if (descripcion !== undefined) { sets.push(`descripcion = $${idx++}`); params.push(descripcion); }
+        if (resultado) { sets.push(`resultado = $${idx++}`); params.push(resultado); }
+        if (notas !== undefined) { sets.push(`notas = $${idx++}`); params.push(notas); }
+
+        if (sets.length) {
             params.push(parseInt(req.params.id));
-            db.prepare(`UPDATE actividades SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+            await pool.query(`UPDATE actividades SET ${sets.join(', ')} WHERE id = $${idx}`, params);
         }
-        const row = db.prepare('SELECT * FROM actividades WHERE id = ?').get(parseInt(req.params.id));
-        res.json({ mensaje: 'Actividad actualizada', actividad: toMongoFormat(row) || row });
+        const { rows } = await pool.query('SELECT * FROM actividades WHERE id = $1', [parseInt(req.params.id)]);
+        res.json({ mensaje: 'Actividad actualizada', actividad: toMongoFormat(rows[0]) || rows[0] });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });
     }

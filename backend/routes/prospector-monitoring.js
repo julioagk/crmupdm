@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const pool = require('../config/database');
 const { auth } = require('../middleware/auth');
 
 const esCloserOAdmin = (req, res, next) => {
-    if (req.usuario.rol !== 'closer' && req.usuario.rol !== 'admin') {
+    if (req.usuario.rol !== 'closer') {
         return res.status(403).json({ msg: 'Acceso denegado. Solo closers.' });
     }
     next();
@@ -58,28 +58,40 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
         const fechaInicioStr = fechaInicio.toISOString();
         const ahoraStr = ahora.toISOString();
 
-        const prospectors = db.prepare('SELECT id, nombre, email as correo FROM usuarios WHERE rol = ?').all('prospector');
-        const prospectorsConMetricas = prospectors.map((prospector) => {
-            const prospectorId = prospector.id;
-            const clientesTotales = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ?').get(prospectorId).c;
-            const clientesNuevos = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND fechaRegistro >= ?').get(prospectorId, fechaInicioStr).c;
-            const actividades = db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?').all(prospectorId, fechaInicioStr, ahoraStr);
+        const { rows: prospectors } = await pool.query('SELECT id, nombre, email as correo FROM usuarios WHERE rol = $1', ['prospector']);
+
+        const prospectorsConMetricas = await Promise.all(prospectors.map(async (prospector) => {
+            const pid = prospector.id;
+            const [
+                { rows: [{ c: clientesTotales }] },
+                { rows: [{ c: clientesNuevos }] },
+                { rows: actividades },
+                { rows: [{ c: citasAgendadas }] },
+                { rows: [{ c: transferencias }] },
+                dist
+            ] = await Promise.all([
+                pool.query('SELECT COUNT(*) as c FROM clientes WHERE "prospectorAsignado" = $1', [pid]),
+                pool.query('SELECT COUNT(*) as c FROM clientes WHERE "prospectorAsignado" = $1 AND "fechaRegistro" >= $2', [pid, fechaInicioStr]),
+                pool.query('SELECT * FROM actividades WHERE vendedor = $1 AND fecha >= $2 AND fecha <= $3', [pid, fechaInicioStr, ahoraStr]),
+                pool.query('SELECT COUNT(*) as c FROM clientes WHERE "prospectorAsignado" = $1 AND "etapaEmbudo" = $2 AND "fechaUltimaEtapa" >= $3', [pid, 'reunion_agendada', fechaInicioStr]),
+                pool.query('SELECT COUNT(*) as c FROM clientes WHERE "prospectorAsignado" = $1 AND "closerAsignado" IS NOT NULL AND "fechaTransferencia" >= $2', [pid, fechaInicioStr]),
+                Promise.all(['prospecto_nuevo', 'en_contacto', 'reunion_agendada'].map(e =>
+                    pool.query('SELECT COUNT(*) as c FROM clientes WHERE "prospectorAsignado" = $1 AND "etapaEmbudo" = $2', [pid, e])
+                ))
+            ]);
 
             const llamadas = actividades.filter(a => a.tipo === 'llamada');
             const llamadasExitosas = llamadas.filter(a => a.resultado === 'exitoso');
             const mensajes = actividades.filter(a => ['mensaje', 'correo', 'whatsapp'].includes(a.tipo));
 
-            const citasAgendadas = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ? AND fechaUltimaEtapa >= ?').get(prospectorId, 'reunion_agendada', fechaInicioStr).c;
-            const transferencias = db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND closerAsignado IS NOT NULL AND fechaTransferencia >= ?').get(prospectorId, fechaInicioStr).c;
-
-            const rendimiento = calcularEstado(llamadas.length, citasAgendadas, periodo);
+            const rendimiento = calcularEstado(llamadas.length, parseInt(citasAgendadas), periodo);
             const tasaContacto = llamadas.length > 0 ? ((llamadasExitosas.length / llamadas.length) * 100).toFixed(1) : 0;
-            const tasaAgendamiento = llamadasExitosas.length > 0 ? ((citasAgendadas / llamadasExitosas.length) * 100).toFixed(1) : 0;
+            const tasaAgendamiento = llamadasExitosas.length > 0 ? ((parseInt(citasAgendadas) / llamadasExitosas.length) * 100).toFixed(1) : 0;
 
             const distribucion = {
-                prospecto_nuevo: db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ?').get(prospectorId, 'prospecto_nuevo').c,
-                en_contacto: db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ?').get(prospectorId, 'en_contacto').c,
-                reunion_agendada: db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ?').get(prospectorId, 'reunion_agendada').c
+                prospecto_nuevo: parseInt(dist[0].rows[0].c),
+                en_contacto: parseInt(dist[1].rows[0].c),
+                reunion_agendada: parseInt(dist[2].rows[0].c)
             };
 
             return {
@@ -87,8 +99,8 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 metricas: {
                     llamadas: { total: llamadas.length, exitosas: llamadasExitosas.length },
                     mensajes: { total: mensajes.length },
-                    citas: { agendadas: citasAgendadas, transferidas: transferencias },
-                    prospectos: { total: clientesTotales, nuevos: clientesNuevos, revisados: llamadas.length },
+                    citas: { agendadas: parseInt(citasAgendadas), transferidas: parseInt(transferencias) },
+                    prospectos: { total: parseInt(clientesTotales), nuevos: parseInt(clientesNuevos), revisados: llamadas.length },
                     tasas: { contacto: parseFloat(tasaContacto), agendamiento: parseFloat(tasaAgendamiento) }
                 },
                 distribucion,
@@ -99,7 +111,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 },
                 periodo
             };
-        });
+        }));
 
         const ordenEstado = { 'excelente': 0, 'bueno': 1, 'bajo': 2, 'critico': 3, 'sin_datos': 4 };
         prospectorsConMetricas.sort((a, b) => ordenEstado[a.rendimiento.estado] - ordenEstado[b.rendimiento.estado]);
