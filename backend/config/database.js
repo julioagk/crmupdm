@@ -36,17 +36,17 @@ const CAMEL_COLS = [
   'vendedorNombre', 'vendedorRol', 'closerNombre', 'sitioWeb'
 ];
 
-// Helper: convierte '?' a '$1', '$2', etc. para Postgres  y  normaliza columnas camelCase a minúsculas
+// Helper: convierte '?' a '$1', '$2', etc. para Postgres y añade comillas dobles a columnas camelCase
 const convertSql = (sql) => {
   if (!isPostgres) return sql;
   let count = 1;
   let res = sql.replace(/\?/g, () => `$${count++}`);
-  // Postgres guarda los nombres sin comillas en minúsculas; reemplazamos las referencias camelCase
+  // Las columnas camelCase fueron creadas con comillas dobles en Postgres, por lo que deben
+  // referenciarse con comillas dobles para preservar el case (e.g., "closerAsignado")
   CAMEL_COLS.forEach(col => {
-    const lower = col.toLowerCase();
-    // Reemplaza col exacta (word boundary) que NO esté entre comillas simples
-    const reg = new RegExp(`(?<!['"]\\w*)\\b${col}\\b(?!\\w*['"])`, 'g');
-    res = res.replace(reg, lower);
+    // Reemplaza col exacta que no esté ya entre comillas dobles
+    const reg = new RegExp(`(?<!")\\b${col}\\b(?!")`, 'g');
+    res = res.replace(reg, `"${col}"`);
   });
   return res;
 };
