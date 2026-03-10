@@ -136,9 +136,9 @@ router.get('/dashboard', [auth, esProspector], async (req, res) => {
         };
         // Prospectos nuevos: campo 'fechaRegistro'
         const FILTROS_CLI = {
-            dia: `(fecharegistro LIKE '${startOfDay}%' OR (fecharegistro IS NULL AND fechaultimaetapa LIKE '${startOfDay}%'))`,
-            semana: `(fecharegistro >= '${startOfWeek}T00:00:00.000Z' OR (fecharegistro IS NULL AND fechaultimaetapa >= '${startOfWeek}T00:00:00.000Z'))`,
-            mes: `(fecharegistro >= '${startOfMonth}T00:00:00.000Z' OR (fecharegistro IS NULL AND fechaultimaetapa >= '${startOfMonth}T00:00:00.000Z'))`,
+            dia: `(fechaRegistro LIKE '${startOfDay}%' OR (fechaRegistro IS NULL AND fechaUltimaEtapa LIKE '${startOfDay}%'))`,
+            semana: `(fechaRegistro >= '${startOfWeek}T00:00:00.000Z' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfWeek}T00:00:00.000Z'))`,
+            mes: `(fechaRegistro >= '${startOfMonth}T00:00:00.000Z' OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= '${startOfMonth}T00:00:00.000Z'))`,
             total: null
         };
         // Reuniones agendadas: campo 'fecha' (en tabla actividades)
