@@ -338,7 +338,7 @@ const CloserMonitoreoProspectors = () => {
                                         );
                                     }
                                     return lista.map(p => {
-                                        const nombre = p.nombre || [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || 'Sin nombre';
+                                        const nombre = p.nombre || [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre';
                                         return (
                                             <div key={p.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100 hover:border-green-200 transition-colors">
                                                 <div className="flex items-center gap-2">
