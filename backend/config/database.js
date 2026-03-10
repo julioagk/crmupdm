@@ -291,6 +291,30 @@ const initDb = async () => {
       console.error('⚠️ Migración telefono2 falló (no crítico):', e.message);
     }
   }
+  try {
+    if (isPostgres) {
+      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "proximaLlamada" TIMESTAMPTZ');
+    } else {
+      internalDb.prepare('ALTER TABLE clientes ADD COLUMN proximaLlamada TEXT').run();
+    }
+    console.log('✅ Migración proximaLlamada completada');
+  } catch (e) {
+    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
+      console.error('⚠️ Migración proximaLlamada falló (no crítico):', e.message);
+    }
+  }
+  try {
+    if (isPostgres) {
+      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS interes TEXT');
+    } else {
+      internalDb.prepare('ALTER TABLE clientes ADD COLUMN interes TEXT').run();
+    }
+    console.log('✅ Migración interes completada');
+  } catch (e) {
+    if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
+      console.error('⚠️ Migración interes falló (no crítico):', e.message);
+    }
+  }
 };
 
 initDb();
