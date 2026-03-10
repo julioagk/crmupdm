@@ -315,6 +315,31 @@ const initDb = async () => {
       console.error('⚠️ Migración interes falló (no crítico):', e.message);
     }
   }
+  // Migración: renombrar columnas google de lowercase a camelCase en usuarios
+  if (isPostgres) {
+    try {
+      await internalDb.query(`
+        DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googlerefreshtoken') THEN
+            ALTER TABLE usuarios RENAME COLUMN googlerefreshtoken TO "googleRefreshToken";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googleaccesstoken') THEN
+            ALTER TABLE usuarios RENAME COLUMN googleaccesstoken TO "googleAccessToken";
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='googletokenexpiry') THEN
+            ALTER TABLE usuarios RENAME COLUMN googletokenexpiry TO "googleTokenExpiry";
+          END IF;
+        END $$;
+      `);
+      // Agregar columnas si aún no existen (DB limpia)
+      await internalDb.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS "googleRefreshToken" TEXT');
+      await internalDb.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS "googleAccessToken" TEXT');
+      await internalDb.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS "googleTokenExpiry" TIMESTAMPTZ');
+      console.log('✅ Migración columnas google en usuarios completada');
+    } catch (e) {
+      console.error('⚠️ Migración google columns falló (no crítico):', e.message);
+    }
+  }
 };
 
 initDb();
