@@ -268,13 +268,20 @@ const initDb = async () => {
   }
   try {
     if (isPostgres) {
-      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS sitioweb TEXT');
+      // Renombrar si existe en lowercase, luego agregar si no existe
+      await internalDb.query(`
+        DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='sitioweb') THEN
+            ALTER TABLE clientes RENAME COLUMN sitioweb TO "sitioWeb";
+          END IF;
+        END $$;
+      `);
+      await internalDb.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "sitioWeb" TEXT');
     } else {
       internalDb.prepare('ALTER TABLE clientes ADD COLUMN sitioWeb TEXT').run();
     }
     console.log('✅ Migración sitioWeb completada');
   } catch (e) {
-    // Ignorar error si la columna ya existe
     if (!e.message.includes('duplicate') && !e.message.includes('already exists')) {
       console.error('⚠️ Migración sitioWeb falló (no crítico):', e.message);
     }
