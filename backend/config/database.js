@@ -123,8 +123,9 @@ const db = {
     };
   },
   exec: async (sql) => {
+    const finalSql = convertSql(sql);
     if (isPostgres) {
-      return internalDb.query(sql);
+      return internalDb.query(finalSql);
     } else {
       return internalDb.exec(sql);
     }
