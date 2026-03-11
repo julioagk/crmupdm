@@ -316,8 +316,12 @@ const ProspectorDashboard = () => {
                                     tareasPendientes.map((t) => {
                                         const prospectoId = t.cliente || t.clienteId;
                                         const irAProspecto = prospectoId
-                                            ? () => {
-                                                setTareas(prev => prev.filter(task => (task.id || task._id) !== (t.id || t._id)));
+                                            ? async () => {
+                                                const tareaId = t.id || t._id;
+                                                setTareas(prev => prev.filter(task => (task.id || task._id) !== tareaId));
+                                                try {
+                                                    await axios.put(`${API_URL}/api/tareas/${tareaId}`, { estado: 'completada' }, { headers: getAuthHeaders() });
+                                                } catch (e) { console.error('Error al completar tarea:', e); }
                                                 navigate('/prospector/prospectos', { state: { selectedId: prospectoId } });
                                             }
                                             : null;
