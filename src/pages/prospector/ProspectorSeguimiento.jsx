@@ -1389,7 +1389,8 @@ const ProspectorSeguimiento = () => {
                                                 <p className="font-semibold text-gray-800">¿Cuál fue el resultado de la llamada?</p>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <button
-                                                        onClick={() => {
+                                                        onClick={async () => {
+                                                            await registrarActividad({ tipo: 'llamada', resultado: 'exitoso', notas: 'Agendó reunión' });
                                                             setLlamadaFlow(null);
                                                             navigate(`/${rolePath}/calendario`, { state: { prospecto: prospectoSeleccionado } });
                                                         }}
