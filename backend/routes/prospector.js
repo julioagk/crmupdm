@@ -729,8 +729,8 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
                 const event = {
                     summary: `[CITA AGENDADA] - ${cliente.nombres} ${cliente.apellidoPaterno}`,
                     description: `Cliente: ${cliente.telefono} - ${cliente.empresa || 'Sin empresa'}\nNotas: ${notas || 'Sin notas'}\nAgendado por Prospecter ${req.usuario.nombre}.`,
-                    start: { dateTime: fechaReunionISO, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-                    end: { dateTime: finReunionISO, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+                    start: { dateTime: fechaReunionISO, timeZone: 'America/Mexico_City' },
+                    end: { dateTime: finReunionISO, timeZone: 'America/Mexico_City' },
                     attendees: attendeesList,
                     conferenceData: {
                         createRequest: { requestId: 'meeting-' + Date.now().toString() }
@@ -754,10 +754,11 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
         // ** END GOOGLE CALENDAR INTEGRATION **
 
 
+        const fechaDisplayMX = new Date(fechaReunion).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short' });
         await db.prepare(`
             INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas, cambioEtapa, etapaAnterior, etapaNueva)
             VALUES (?, ?, ?, ?, ?, 'pendiente', ?, 1, 'en_contacto', 'reunion_agendada')
-        `).run('cita', prospectorId, cid, now, `Reunión agendada para el ${new Date(fechaReunion).toLocaleString()} por prospector ${req.usuario.nombre} → Asignada a closer`, notas || '');
+        `).run('cita', prospectorId, cid, fechaReunionISO, `Reunión agendada para el ${fechaDisplayMX} por prospector ${req.usuario.nombre} → Asignada a closer`, notas || '');
 
         const clienteActualizado = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
         const actividadRow = await db.prepare('SELECT * FROM actividades WHERE cliente = ? ORDER BY id DESC LIMIT 1').get(cid);
