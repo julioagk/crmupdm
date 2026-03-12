@@ -19,6 +19,36 @@ if (!process.env.VITE_GOOGLE_CLIENT_ID && !process.env.GOOGLE_CLIENT_ID) {
     console.error('❌ CRITICAL: Google Client ID is not defined in environment variables!');
 }
 
+// Helper: detecta si el error de Google es por token revocado/expirado (invalid_grant)
+function isGoogleAuthError(error) {
+    const code = error?.code || error?.status || error?.response?.status;
+    const msg = (error?.message || '').toLowerCase();
+    const dataError = (error?.response?.data?.error || '').toLowerCase();
+    const dataDesc = (error?.response?.data?.error_description || '').toLowerCase();
+    const combined = `${msg} ${dataError} ${dataDesc}`;
+    return (
+        code === 400 || code === 401 || code === 403 ||
+        combined.includes('invalid_grant') ||
+        combined.includes('token has been expired or revoked') ||
+        combined.includes('insufficient authentication scopes') ||
+        combined.includes('insufficientscopeerror') ||
+        combined.includes('authError') ||
+        combined.includes('forbidden')
+    );
+}
+
+// Helper: limpia tokens de Google de un usuario en la BD
+async function clearGoogleTokens(userId) {
+    try {
+        await db.prepare(
+            'UPDATE usuarios SET googleRefreshToken = NULL, googleAccessToken = NULL, googleTokenExpiry = NULL WHERE id = ?'
+        ).run(userId);
+        console.warn(`⚠️ Tokens de Google limpiados para usuario ${userId} por token revocado/expirado`);
+    } catch (e) {
+        console.error('Error limpiando tokens de Google:', e.message);
+    }
+}
+
 // @route   POST api/google/save-tokens
 // @desc    Intercambia código por tokens y los guarda para el usuario autenticado
 // @access  Private
@@ -128,31 +158,13 @@ router.get('/freebusy/:closerId', auth, async (req, res) => {
         res.json(response.data);
 
     } catch (error) {
-        console.error('Error en freebusy:', error);
-        // Detectar token revocado o scopes insuficientes → pedir al usuario re-vincular
-        const msg = (error?.message || '').toLowerCase();
-        const nestedMsg = (error?.response?.data?.error?.message || error?.errors?.[0]?.message || '').toLowerCase();
-        const combinedMsg = msg + ' ' + nestedMsg;
-        const isAuthError =
-            error?.code === 401 || error?.code === 403 ||
-            error?.status === 401 || error?.status === 403 ||
-            combinedMsg.includes('insufficient authentication scopes') ||
-            combinedMsg.includes('insufficientscopeerror') ||
-            combinedMsg.includes('invalid_grant') ||
-            combinedMsg.includes('token has been expired or revoked') ||
-            combinedMsg.includes('authError') ||
-            combinedMsg.includes('forbidden');
-        if (isAuthError) {
-            // Limpiar tokens inválidos del usuario afectado
-            try {
-                await db.prepare(
-                    'UPDATE usuarios SET googleRefreshToken = NULL, googleAccessToken = NULL, googleTokenExpiry = NULL WHERE id = ?'
-                ).run(closerId);
-                console.warn(`⚠️ Tokens de Google limpiados para closer ${closerId} por error de scopes/revocación`);
-            } catch (_) {}
-            return res.status(400).json({
-                msg: 'El closer debe volver a vincular su cuenta de Google Calendar (permisos insuficientes o token revocado).',
-                notLinked: true
+        console.error('Error en freebusy:', error.response ? error.response.data : error.message);
+        if (isGoogleAuthError(error)) {
+            await clearGoogleTokens(closerId);
+            return res.status(401).json({
+                msg: 'El closer debe volver a vincular su cuenta de Google Calendar (token expirado o revocado).',
+                notLinked: true,
+                code: 'google_auth_expired'
             });
         }
         res.status(500).json({ msg: 'Error consultando calendario de Google' });
@@ -224,11 +236,17 @@ router.get('/events', auth, async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error fetching Google events:', error.response ? error.response.data : error.message);
-        const status = error.code || 500;
-        res.status(status === 401 ? 401 : 500).json({
+        if (isGoogleAuthError(error)) {
+            await clearGoogleTokens(userId);
+            return res.status(401).json({
+                msg: 'La autorización de Google expiró o fue revocada. Vuelve a vincular tu cuenta.',
+                notLinked: true,
+                code: 'google_auth_expired'
+            });
+        }
+        res.status(500).json({
             msg: 'Error al consultar eventos',
-            error: error.message,
-            details: error.response ? error.response.data : null
+            error: error.message
         });
     }
 });
@@ -311,6 +329,14 @@ router.post('/create-event', auth, async (req, res) => {
         });
     } catch (error) {
         console.error('Error al crear evento:', error);
+        if (isGoogleAuthError(error)) {
+            await clearGoogleTokens(userId);
+            return res.status(401).json({
+                msg: 'La autorización de Google expiró o fue revocada. Vuelve a vincular tu cuenta.',
+                notLinked: true,
+                code: 'google_auth_expired'
+            });
+        }
         res.status(500).json({ msg: 'Error al crear evento en Google Calendar', error: error.message });
     }
 });
@@ -415,6 +441,14 @@ router.patch('/mark-completed/:eventId', auth, async (req, res) => {
     } catch (error) {
         console.error('❌ Error al actualizar evento en Google Calendar:', error.message);
         console.error('Stack:', error.stack);
+        if (isGoogleAuthError(error)) {
+            await clearGoogleTokens(userId);
+            return res.status(401).json({
+                msg: 'La autorización de Google expiró o fue revocada. Vuelve a vincular tu cuenta.',
+                notLinked: true,
+                code: 'google_auth_expired'
+            });
+        }
         // No fallar si hay error con Google Calendar, ya se registró en BD
         res.status(500).json({
             msg: 'Advertencia: No se pudo sincronizar con Google Calendar, pero se guardó en la BD',
