@@ -377,7 +377,7 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
         console.log(`✅ Registro de actividad por ${req.usuario.nombre} (${req.usuario.rol}) para cliente ${cid}`);
 
         const resultadoFinal = resultado && resultadosValidos.includes(resultado) ? resultado : 'pendiente';
-        const fechaActividad = tipo === 'cita' && fechaCita ? new Date(fechaCita).toISOString() : new Date().toISOString();
+        const fechaActividad = new Date().toISOString();
 
         const ins = await db.prepare(`
             INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas)
