@@ -312,9 +312,14 @@ router.post('/create-event', auth, async (req, res) => {
         if (clienteId) {
             const cid = parseInt(clienteId);
             const now = new Date().toISOString();
+            const fechaReunionTexto = new Date(startDateTime).toLocaleString('es-MX', {
+                timeZone: 'America/Mexico_City',
+                dateStyle: 'short',
+                timeStyle: 'short'
+            });
             try {
                 await db.prepare('INSERT INTO actividades (tipo, vendedor, cliente, fecha, descripcion, resultado, notas) VALUES (?, ?, ?, ?, ?, ?, ?)')
-                    .run('cita', userId, cid, new Date(startDateTime).toISOString(), `Próxima reunión agendada: ${title}`, 'pendiente', description || '');
+                    .run('cita', userId, cid, now, `Proxima reunion agendada para ${fechaReunionTexto}: ${title}`, 'pendiente', description || '');
                 await db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, cid);
             } catch (dbErr) {
                 console.error('Error registrando actividad:', dbErr);

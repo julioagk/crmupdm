@@ -410,7 +410,7 @@ const CloserMonitoreoProspectors = () => {
                                             const fechaObj = evt.fecha ? new Date(evt.fecha) : null;
                                             const hora = fechaObj ? fechaObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '--';
                                             const fecha = fechaObj ? fechaObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : null;
-                                            let icon, iconBg, label, detail;
+                                            let icon, iconBg, label, detail, reunionInfo;
                                             if (evt.tipo === 'prospecto_registrado') {
                                                 icon = <Users className="w-3 h-3 text-green-600" />;
                                                 iconBg = 'bg-green-100';
@@ -431,6 +431,7 @@ const CloserMonitoreoProspectors = () => {
                                                 icon = <Calendar className="w-3 h-3 text-emerald-600" />;
                                                 iconBg = 'bg-emerald-100';
                                                 label = 'Cita agendada';
+                                                reunionInfo = evt.descripcion || null;
                                                 detail = evt.notas || null;
                                             } else {
                                                 icon = <Activity className="w-3 h-3 text-gray-500" />;
@@ -466,6 +467,11 @@ const CloserMonitoreoProspectors = () => {
                                                         {evt.prospecto && (
                                                             <p className="text-[10px] text-green-600 font-semibold mt-0.5 flex items-center gap-1">
                                                                 <Users className="w-2.5 h-2.5" />{evt.prospecto}
+                                                            </p>
+                                                        )}
+                                                        {reunionInfo && (
+                                                            <p className="text-[10px] text-emerald-700 font-medium mt-1 leading-relaxed">
+                                                                {reunionInfo}
                                                             </p>
                                                         )}
                                                         {detail && (
