@@ -14,6 +14,99 @@ const esCloser = (req, res, next) => {
 router.get('/dashboard', [auth, esCloser], async (req, res) => {
     try {
         const closerId = parseInt(req.usuario.id);
+
+        const calcularVariacionPct = (actual, anterior) => {
+            const a = Number(actual || 0);
+            const p = Number(anterior || 0);
+            if (p === 0) return a > 0 ? 100 : 0;
+            return Number((((a - p) / p) * 100).toFixed(1));
+        };
+
+        const inicioDia = (fecha) => {
+            const d = new Date(fecha);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        };
+
+        const finDia = (fecha) => {
+            const d = new Date(fecha);
+            d.setHours(23, 59, 59, 999);
+            return d;
+        };
+
+        const ahora = new Date();
+        const hoyInicioDate = inicioDia(ahora);
+        const hoyFinDate = finDia(ahora);
+        const ayerInicioDate = new Date(hoyInicioDate);
+        ayerInicioDate.setDate(ayerInicioDate.getDate() - 1);
+        const ayerFinDate = finDia(ayerInicioDate);
+
+        const semanaActualInicioDate = new Date(hoyInicioDate);
+        semanaActualInicioDate.setDate(semanaActualInicioDate.getDate() - 6);
+        const semanaActualFinDate = new Date(hoyFinDate);
+        const semanaAnteriorInicioDate = new Date(semanaActualInicioDate);
+        semanaAnteriorInicioDate.setDate(semanaAnteriorInicioDate.getDate() - 7);
+        const semanaAnteriorFinDate = new Date(semanaActualInicioDate);
+        semanaAnteriorFinDate.setMilliseconds(-1);
+
+        const inicioMesDate = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0, 0);
+        const finMesDate = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59, 999);
+        const inicioMesAnteriorDate = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1, 0, 0, 0, 0);
+        const finMesAnteriorDate = new Date(ahora.getFullYear(), ahora.getMonth(), 0, 23, 59, 59, 999);
+
+        const hoyInicio = hoyInicioDate.toISOString();
+        const hoyFin = hoyFinDate.toISOString();
+        const ayerInicio = ayerInicioDate.toISOString();
+        const ayerFin = ayerFinDate.toISOString();
+        const semanaActualInicio = semanaActualInicioDate.toISOString();
+        const semanaActualFin = semanaActualFinDate.toISOString();
+        const semanaAnteriorInicio = semanaAnteriorInicioDate.toISOString();
+        const semanaAnteriorFin = semanaAnteriorFinDate.toISOString();
+        const inicioMes = inicioMesDate.toISOString();
+        const finMes = finMesDate.toISOString();
+        const inicioMesAnterior = inicioMesAnteriorDate.toISOString();
+        const finMesAnterior = finMesAnteriorDate.toISOString();
+
+        const obtenerCitasAgendadas = async (desde, hasta) => {
+            const row = await db.prepare(`
+                SELECT COUNT(*) as c
+                FROM actividades a
+                JOIN clientes c ON a.cliente = c.id
+                WHERE c.closerAsignado = ? AND a.tipo = 'cita' AND a.fecha >= ? AND a.fecha <= ?
+            `).get(closerId, desde, hasta);
+            return row?.c || 0;
+        };
+
+        const obtenerCitasRealizadas = async (desde, hasta) => {
+            const row = await db.prepare(`
+                SELECT COUNT(*) as c
+                FROM actividades
+                WHERE vendedor = ? AND tipo = 'cita' AND resultado != 'pendiente' AND fecha >= ? AND fecha <= ?
+            `).get(closerId, desde, hasta);
+            return row?.c || 0;
+        };
+
+        const obtenerPropuestas = async (desde, hasta) => {
+            const row = await db.prepare(`
+                SELECT COUNT(*) as c
+                FROM actividades
+                WHERE vendedor = ? AND fecha >= ? AND fecha <= ? AND descripcion IS NOT NULL AND LOWER(descripcion) LIKE '%cotiz%'
+            `).get(closerId, desde, hasta);
+            return row?.c || 0;
+        };
+
+        const obtenerVentasResumen = async (desde, hasta) => {
+            const row = await db.prepare(`
+                SELECT COUNT(*) as totalVentas, COALESCE(SUM(monto), 0) as montoTotal
+                FROM ventas
+                WHERE vendedor = ? AND fecha >= ? AND fecha <= ?
+            `).get(closerId, desde, hasta);
+            return {
+                totalVentas: row?.totalVentas || 0,
+                montoTotal: row?.montoTotal || 0
+            };
+        };
+
         const clientes = await db.prepare('SELECT * FROM clientes WHERE closerAsignado = ?').all(closerId);
 
         const embudo = {
@@ -74,19 +167,20 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
             if (venta) embudo.venta_ganada++;
         }
 
-        const hoyInicioDate = new Date();
-        hoyInicioDate.setHours(0, 0, 0, 0);
-        const hoyInicio = hoyInicioDate.toISOString();
-
-        const hoyFinDate = new Date();
-        hoyFinDate.setHours(23, 59, 59, 999);
-        const hoyFin = hoyFinDate.toISOString();
-
         // FIX: Las citas agendadas deben filtrarse por closerAsignado, no por vendedor (que es el prospector)
         const reunionesHoy = await db.prepare(`
             SELECT a.* FROM actividades a
             JOIN clientes c ON a.cliente = c.id
             WHERE c.closerAsignado = ? AND a.tipo = 'cita' AND a.fecha >= ? AND a.fecha <= ?
+        `).all(closerId, hoyInicio, hoyFin);
+
+        const reunionesHoyDetalle = await db.prepare(`
+            SELECT a.id, a.fecha, a.resultado, a.descripcion, a.notas,
+                   c.id as clienteId, c.nombres, c.apellidoPaterno, c.empresa, c.telefono, c.correo
+            FROM actividades a
+            JOIN clientes c ON a.cliente = c.id
+            WHERE c.closerAsignado = ? AND a.tipo = 'cita' AND a.fecha >= ? AND a.fecha <= ?
+            ORDER BY a.fecha ASC
         `).all(closerId, hoyInicio, hoyFin);
 
         const actividadesHoy = await db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?')
@@ -95,12 +189,8 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
         const reunionesRealizadasHoy = actividadesHoy.filter(a => a.tipo === 'cita' && a.resultado !== 'pendiente').length;
         const propuestasHoy = actividadesHoy.filter(a => a.descripcion && a.descripcion.toLowerCase().includes('cotización')).length;
 
-        const inicioMesDate = new Date();
-        inicioMesDate.setDate(1);
-        inicioMesDate.setHours(0, 0, 0, 0);
-        const inicioMes = inicioMesDate.toISOString();
-
-        const ventasMes = await db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ?').all(closerId, inicioMes);
+        const ventasMes = await db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha DESC').all(closerId, inicioMes, finMes);
+        const ventasMesAnterior = await db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha DESC').all(closerId, inicioMesAnterior, finMesAnterior);
         const ventasHoy = await db.prepare('SELECT * FROM ventas WHERE vendedor = ? AND fecha >= ? AND fecha <= ?').all(closerId, hoyInicio, hoyFin);
         const montoTotalMes = ventasMes.reduce((sum, v) => sum + (v.monto || 0), 0);
 
@@ -111,6 +201,117 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
             global: embudo.reunion_agendada > 0 ? ((embudo.venta_ganada / embudo.reunion_agendada) * 100).toFixed(1) : '0.0'
         };
 
+        const citasAyer = await obtenerCitasAgendadas(ayerInicio, ayerFin);
+        const citasSemanaActualAgendadas = await obtenerCitasAgendadas(semanaActualInicio, semanaActualFin);
+        const citasSemanaActualRealizadas = await obtenerCitasRealizadas(semanaActualInicio, semanaActualFin);
+        const citasSemanaAnteriorAgendadas = await obtenerCitasAgendadas(semanaAnteriorInicio, semanaAnteriorFin);
+        const citasSemanaAnteriorRealizadas = await obtenerCitasRealizadas(semanaAnteriorInicio, semanaAnteriorFin);
+
+        const propuestasMesActual = await obtenerPropuestas(inicioMes, finMes);
+        const propuestasMesAnterior = await obtenerPropuestas(inicioMesAnterior, finMesAnterior);
+        const reunionesMesActual = await obtenerCitasRealizadas(inicioMes, finMes);
+        const reunionesMesAnterior = await obtenerCitasRealizadas(inicioMesAnterior, finMesAnterior);
+        const ventasMesActualResumen = await obtenerVentasResumen(inicioMes, finMes);
+        const ventasMesAnteriorResumen = await obtenerVentasResumen(inicioMesAnterior, finMesAnterior);
+
+        const tasaAsistenciaSemanaActual = citasSemanaActualAgendadas > 0 ? Number(((citasSemanaActualRealizadas / citasSemanaActualAgendadas) * 100).toFixed(1)) : 0;
+        const tasaAsistenciaSemanaAnterior = citasSemanaAnteriorAgendadas > 0 ? Number(((citasSemanaAnteriorRealizadas / citasSemanaAnteriorAgendadas) * 100).toFixed(1)) : 0;
+        const tasaInteresMesActual = reunionesMesActual > 0 ? Number(((propuestasMesActual / reunionesMesActual) * 100).toFixed(1)) : 0;
+        const tasaInteresMesAnterior = reunionesMesAnterior > 0 ? Number(((propuestasMesAnterior / reunionesMesAnterior) * 100).toFixed(1)) : 0;
+        const tasaCierreMesActual = propuestasMesActual > 0 ? Number(((ventasMesActualResumen.totalVentas / propuestasMesActual) * 100).toFixed(1)) : 0;
+        const tasaCierreMesAnterior = propuestasMesAnterior > 0 ? Number(((ventasMesAnteriorResumen.totalVentas / propuestasMesAnterior) * 100).toFixed(1)) : 0;
+
+        const comparativos = {
+            reunionesHoy: {
+                actual: reunionesHoy.length,
+                anterior: citasAyer,
+                variacion: calcularVariacionPct(reunionesHoy.length, citasAyer),
+                etiquetaActual: 'Hoy',
+                etiquetaAnterior: 'Ayer'
+            },
+            asistenciaSemanal: {
+                actual: tasaAsistenciaSemanaActual,
+                anterior: tasaAsistenciaSemanaAnterior,
+                variacion: calcularVariacionPct(tasaAsistenciaSemanaActual, tasaAsistenciaSemanaAnterior),
+                etiquetaActual: '7 dias',
+                etiquetaAnterior: '7 dias previos'
+            },
+            cierreMensual: {
+                actual: tasaCierreMesActual,
+                anterior: tasaCierreMesAnterior,
+                variacion: calcularVariacionPct(tasaCierreMesActual, tasaCierreMesAnterior),
+                etiquetaActual: 'Mes actual',
+                etiquetaAnterior: 'Mes anterior'
+            },
+            montoMensual: {
+                actual: Number(ventasMesActualResumen.montoTotal || 0),
+                anterior: Number(ventasMesAnteriorResumen.montoTotal || 0),
+                variacion: calcularVariacionPct(ventasMesActualResumen.montoTotal, ventasMesAnteriorResumen.montoTotal),
+                etiquetaActual: 'Mes actual',
+                etiquetaAnterior: 'Mes anterior'
+            },
+            interesMensual: {
+                actual: tasaInteresMesActual,
+                anterior: tasaInteresMesAnterior,
+                variacion: calcularVariacionPct(tasaInteresMesActual, tasaInteresMesAnterior),
+                etiquetaActual: 'Mes actual',
+                etiquetaAnterior: 'Mes anterior'
+            },
+            ventasMensual: {
+                actual: ventasMes.length,
+                anterior: ventasMesAnterior.length,
+                variacion: calcularVariacionPct(ventasMes.length, ventasMesAnterior.length),
+                etiquetaActual: 'Mes actual',
+                etiquetaAnterior: 'Mes anterior'
+            }
+        };
+
+        const detalleKpis = {
+            reunionesHoy: {
+                titulo: 'Reuniones de hoy',
+                tipo: 'reuniones',
+                items: reunionesHoyDetalle.map((r) => ({
+                    id: r.id,
+                    fecha: r.fecha,
+                    resultado: r.resultado,
+                    descripcion: r.descripcion,
+                    notas: r.notas,
+                    clienteId: r.clienteId,
+                    clienteNombre: [r.nombres, r.apellidoPaterno].filter(Boolean).join(' ') || 'Sin nombre',
+                    empresa: r.empresa || null,
+                    telefono: r.telefono || null,
+                    correo: r.correo || null
+                }))
+            },
+            ventasMes: {
+                titulo: 'Ventas del mes',
+                tipo: 'ventas',
+                items: ventasMes.map((v) => ({
+                    id: v.id,
+                    fecha: v.fecha,
+                    monto: v.monto || 0,
+                    descripcion: v.descripcion || null,
+                    cliente: v.cliente || null
+                }))
+            },
+            resumenTasas: {
+                titulo: 'Detalle de tasas',
+                tipo: 'resumen_tasas',
+                asistencia: {
+                    actual: { agendadas: citasSemanaActualAgendadas, realizadas: citasSemanaActualRealizadas, tasa: tasaAsistenciaSemanaActual },
+                    anterior: { agendadas: citasSemanaAnteriorAgendadas, realizadas: citasSemanaAnteriorRealizadas, tasa: tasaAsistenciaSemanaAnterior }
+                },
+                interes: {
+                    actual: { reuniones: reunionesMesActual, propuestas: propuestasMesActual, tasa: tasaInteresMesActual },
+                    anterior: { reuniones: reunionesMesAnterior, propuestas: propuestasMesAnterior, tasa: tasaInteresMesAnterior }
+                },
+                cierre: {
+                    actual: { propuestas: propuestasMesActual, ventas: ventasMesActualResumen.totalVentas, tasa: tasaCierreMesActual },
+                    anterior: { propuestas: propuestasMesAnterior, ventas: ventasMesAnteriorResumen.totalVentas, tasa: tasaCierreMesAnterior }
+                }
+            }
+        };
+
         res.json({
             embudo,
             metricas: {
@@ -119,7 +320,9 @@ router.get('/dashboard', [auth, esCloser], async (req, res) => {
                 negociaciones: { activas: embudo.en_negociacion }
             },
             tasasConversion,
-            analisisPerdidas
+            analisisPerdidas,
+            comparativos,
+            detalleKpis
         });
     } catch (error) {
         console.error(error);
