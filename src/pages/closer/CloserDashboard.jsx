@@ -334,6 +334,10 @@ const CloserDashboard = () => {
         );
     };
 
+    const toggleKpi = (key) => {
+        setKpiActivo((prev) => (prev === key ? null : key));
+    };
+
     return (
         <div className="h-full flex flex-col p-5 overflow-hidden">
             <div className="flex-1 flex flex-col space-y-4 overflow-hidden min-h-0">
@@ -414,7 +418,7 @@ const CloserDashboard = () => {
                             {/* Row 1 */}
                             <button
                                 type="button"
-                                onClick={() => setKpiActivo('reuniones_hoy')}
+                                onClick={() => toggleKpi('reuniones_hoy')}
                                 className={`bg-white border-2 rounded-xl p-4 shadow-md flex flex-col items-center justify-center transition-all hover:shadow-lg ${kpiActivo === 'reuniones_hoy' ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-200'}`}
                             >
                                 <Calendar className="w-8 h-8 text-blue-600 mb-2" />
@@ -425,7 +429,7 @@ const CloserDashboard = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setKpiActivo('tasa_asistencia')}
+                                onClick={() => toggleKpi('tasa_asistencia')}
                                 className={`bg-white border-2 rounded-xl p-4 shadow-md flex flex-col items-center justify-center transition-all hover:shadow-lg ${kpiActivo === 'tasa_asistencia' ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-gray-200'}`}
                             >
                                 <CheckCircle2 className="w-8 h-8 text-cyan-600 mb-2" />
@@ -437,7 +441,7 @@ const CloserDashboard = () => {
                             {/* Row 2 */}
                             <button
                                 type="button"
-                                onClick={() => setKpiActivo('tasa_cierre')}
+                                onClick={() => toggleKpi('tasa_cierre')}
                                 className={`bg-white border-2 rounded-xl p-4 shadow-md flex flex-col items-center justify-center transition-all hover:shadow-lg ${kpiActivo === 'tasa_cierre' ? 'border-green-400 ring-2 ring-green-100' : 'border-gray-200'}`}
                             >
                                 <TrendingUp className="w-8 h-8 text-green-600 mb-2" />
@@ -448,7 +452,7 @@ const CloserDashboard = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setKpiActivo('monto_mes')}
+                                onClick={() => toggleKpi('monto_mes')}
                                 className={`bg-white border-2 rounded-xl p-4 shadow-md flex flex-col items-center justify-center transition-all hover:shadow-lg ${kpiActivo === 'monto_mes' ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-gray-200'}`}
                             >
                                 <DollarSign className="w-8 h-8 text-emerald-600 mb-2" />
@@ -460,7 +464,7 @@ const CloserDashboard = () => {
                             {/* Row 3 */}
                             <button
                                 type="button"
-                                onClick={() => setKpiActivo('tasa_interes')}
+                                onClick={() => toggleKpi('tasa_interes')}
                                 className={`bg-white border-2 rounded-xl p-4 shadow-md flex flex-col items-center justify-center transition-all hover:shadow-lg ${kpiActivo === 'tasa_interes' ? 'border-purple-400 ring-2 ring-purple-100' : 'border-gray-200'}`}
                             >
                                 <Award className="w-8 h-8 text-purple-600 mb-2" />
@@ -471,7 +475,7 @@ const CloserDashboard = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setKpiActivo('ventas_mes')}
+                                onClick={() => toggleKpi('ventas_mes')}
                                 className={`bg-white border-2 rounded-xl p-4 shadow-md flex flex-col items-center justify-center transition-all hover:shadow-lg ${kpiActivo === 'ventas_mes' ? 'border-pink-400 ring-2 ring-pink-100' : 'border-gray-200'}`}
                             >
                                 <TrendingUp className="w-8 h-8 text-pink-600 mb-2" />
@@ -481,56 +485,6 @@ const CloserDashboard = () => {
                             </button>
                         </div>
 
-                        {kpiActivo && (
-                            <div className="mt-4 bg-white border border-gray-200 rounded-xl p-4 shadow-md overflow-hidden">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-gray-900">Detalle del KPI</h3>
-                                    <button type="button" onClick={() => setKpiActivo(null)} className="text-xs font-semibold text-gray-500 hover:text-gray-700">Cerrar</button>
-                                </div>
-
-                                {kpiActivo === 'reuniones_hoy' && (
-                                    <div className="max-h-56 overflow-y-auto pr-1 space-y-2">
-                                        {(data.detalleKpis?.reunionesHoy?.items || []).length === 0 ? (
-                                            <p className="text-xs text-gray-500 italic">No hay reuniones registradas hoy.</p>
-                                        ) : (data.detalleKpis?.reunionesHoy?.items || []).map((item) => (
-                                            <div key={item.id} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50">
-                                                <p className="text-xs font-bold text-gray-800">{item.clienteNombre}</p>
-                                                <p className="text-[11px] text-gray-500">{item.empresa || 'Sin empresa'} • {new Date(item.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {kpiActivo === 'ventas_mes' && (
-                                    <div className="max-h-56 overflow-y-auto pr-1 space-y-2">
-                                        {(data.detalleKpis?.ventasMes?.items || []).length === 0 ? (
-                                            <p className="text-xs text-gray-500 italic">No hay ventas en este mes.</p>
-                                        ) : (data.detalleKpis?.ventasMes?.items || []).map((venta) => (
-                                            <div key={venta.id} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50 flex items-center justify-between gap-2">
-                                                <div>
-                                                    <p className="text-xs font-bold text-gray-800">Venta #{venta.id}</p>
-                                                    <p className="text-[11px] text-gray-500">{new Date(venta.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</p>
-                                                </div>
-                                                <p className="text-xs font-bold text-emerald-700">${Number(venta.monto || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {['tasa_asistencia', 'tasa_interes', 'tasa_cierre', 'monto_mes'].includes(kpiActivo) && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                            <p className="text-[10px] uppercase text-gray-500 font-bold mb-1">Periodo Actual</p>
-                                            <p className="text-sm font-black text-gray-900">{kpiActivo === 'tasa_asistencia' ? `${data.detalleKpis?.resumenTasas?.asistencia?.actual?.tasa || 0}%` : kpiActivo === 'tasa_interes' ? `${data.detalleKpis?.resumenTasas?.interes?.actual?.tasa || 0}%` : kpiActivo === 'tasa_cierre' ? `${data.detalleKpis?.resumenTasas?.cierre?.actual?.tasa || 0}%` : `$${(data.comparativos?.montoMensual?.actual || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`}</p>
-                                        </div>
-                                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                            <p className="text-[10px] uppercase text-gray-500 font-bold mb-1">Periodo Anterior</p>
-                                            <p className="text-sm font-black text-gray-900">{kpiActivo === 'tasa_asistencia' ? `${data.detalleKpis?.resumenTasas?.asistencia?.anterior?.tasa || 0}%` : kpiActivo === 'tasa_interes' ? `${data.detalleKpis?.resumenTasas?.interes?.anterior?.tasa || 0}%` : kpiActivo === 'tasa_cierre' ? `${data.detalleKpis?.resumenTasas?.cierre?.anterior?.tasa || 0}%` : `$${(data.comparativos?.montoMensual?.anterior || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Right Side: Tasks/Goals Sidebar - White Section (2 columns) */}
@@ -622,6 +576,59 @@ const CloserDashboard = () => {
                     </div>
                 </div>
             </div>
+
+            {kpiActivo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setKpiActivo(null)}>
+                    <div className="w-full max-w-2xl max-h-[85vh] bg-white rounded-2xl border border-gray-200 shadow-2xl p-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-bold text-gray-900">Detalle del KPI</h3>
+                            <button type="button" onClick={() => setKpiActivo(null)} className="text-xs font-semibold text-gray-500 hover:text-gray-700">Cerrar</button>
+                        </div>
+
+                        {kpiActivo === 'reuniones_hoy' && (
+                            <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-2">
+                                {(data.detalleKpis?.reunionesHoy?.items || []).length === 0 ? (
+                                    <p className="text-xs text-gray-500 italic">No hay reuniones registradas hoy.</p>
+                                ) : (data.detalleKpis?.reunionesHoy?.items || []).map((item) => (
+                                    <div key={item.id} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50">
+                                        <p className="text-xs font-bold text-gray-800">{item.clienteNombre}</p>
+                                        <p className="text-[11px] text-gray-500">{item.empresa || 'Sin empresa'} • {new Date(item.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {kpiActivo === 'ventas_mes' && (
+                            <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-2">
+                                {(data.detalleKpis?.ventasMes?.items || []).length === 0 ? (
+                                    <p className="text-xs text-gray-500 italic">No hay ventas en este mes.</p>
+                                ) : (data.detalleKpis?.ventasMes?.items || []).map((venta) => (
+                                    <div key={venta.id} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50 flex items-center justify-between gap-2">
+                                        <div>
+                                            <p className="text-xs font-bold text-gray-800">Venta #{venta.id}</p>
+                                            <p className="text-[11px] text-gray-500">{new Date(venta.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</p>
+                                        </div>
+                                        <p className="text-xs font-bold text-emerald-700">${Number(venta.monto || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {['tasa_asistencia', 'tasa_interes', 'tasa_cierre', 'monto_mes'].includes(kpiActivo) && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                    <p className="text-[10px] uppercase text-gray-500 font-bold mb-1">Periodo Actual</p>
+                                    <p className="text-sm font-black text-gray-900">{kpiActivo === 'tasa_asistencia' ? `${data.detalleKpis?.resumenTasas?.asistencia?.actual?.tasa || 0}%` : kpiActivo === 'tasa_interes' ? `${data.detalleKpis?.resumenTasas?.interes?.actual?.tasa || 0}%` : kpiActivo === 'tasa_cierre' ? `${data.detalleKpis?.resumenTasas?.cierre?.actual?.tasa || 0}%` : `$${(data.comparativos?.montoMensual?.actual || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`}</p>
+                                </div>
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                    <p className="text-[10px] uppercase text-gray-500 font-bold mb-1">Periodo Anterior</p>
+                                    <p className="text-sm font-black text-gray-900">{kpiActivo === 'tasa_asistencia' ? `${data.detalleKpis?.resumenTasas?.asistencia?.anterior?.tasa || 0}%` : kpiActivo === 'tasa_interes' ? `${data.detalleKpis?.resumenTasas?.interes?.anterior?.tasa || 0}%` : kpiActivo === 'tasa_cierre' ? `${data.detalleKpis?.resumenTasas?.cierre?.anterior?.tasa || 0}%` : `$${(data.comparativos?.montoMensual?.anterior || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
