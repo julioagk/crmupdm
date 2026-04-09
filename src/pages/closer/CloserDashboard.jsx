@@ -339,8 +339,8 @@ const CloserDashboard = () => {
     };
 
     return (
-        <div className="h-full flex flex-col p-5 overflow-hidden">
-            <div className="flex-1 flex flex-col space-y-4 overflow-hidden min-h-0">
+        <div className="min-h-full flex flex-col p-5">
+            <div className="flex flex-col space-y-4 min-h-0">
                 {/* Embudo Header - White Section */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-md flex-shrink-0">
                     <div className="flex items-center justify-between mb-2">
@@ -411,10 +411,10 @@ const CloserDashboard = () => {
                 </div>
 
                 {/* Main Content: Metrics Grid + Tasks Sidebar */}
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
                     {/* Left Side: Metrics Grid (2 columns) */}
-                    <div className="lg:col-span-2 flex flex-col min-h-0">
-                        <div className="grid grid-cols-2 grid-rows-3 gap-4 flex-1">
+                    <div className="lg:col-span-2 flex flex-col">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Row 1 */}
                             <button
                                 type="button"
@@ -488,8 +488,8 @@ const CloserDashboard = () => {
                     </div>
 
                     {/* Right Side: Tasks/Goals Sidebar - White Section (2 columns) */}
-                    <div className="lg:col-span-2 flex flex-col min-h-0">
-                        <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col overflow-hidden">
+                    <div className="lg:col-span-2 flex flex-col">
+                        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col min-h-[420px]">
                             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2 flex-shrink-0">
                                 <Calendar className="w-6 h-6 text-blue-600" />
                                 Próximas Reuniones
