@@ -42,9 +42,47 @@ function getDescripcionEstado(estado) {
     return descripciones[estado] || 'Estado desconocido';
 }
 
+function construirRangoPeriodo(periodo, ahora, mesParam, anioParam) {
+    let fechaInicio = new Date(ahora);
+    let fechaFin = new Date(ahora);
+    let mesSeleccionado = null;
+
+    if (periodo === 'diario') {
+        fechaInicio.setHours(0, 0, 0, 0);
+    } else if (periodo === 'semanal') {
+        fechaInicio.setDate(ahora.getDate() - 7);
+        fechaInicio.setHours(0, 0, 0, 0);
+    } else if (periodo === 'mensual') {
+        const mes = mesParam ? Number.parseInt(mesParam, 10) : NaN;
+        const anio = anioParam ? Number.parseInt(anioParam, 10) : NaN;
+        const mesValido = Number.isInteger(mes) && mes >= 1 && mes <= 12;
+        const anioValido = Number.isInteger(anio) && anio >= 2000 && anio <= 2100;
+
+        if (mesValido && anioValido) {
+            fechaInicio = new Date(Date.UTC(anio, mes - 1, 1, 0, 0, 0, 0));
+            fechaFin = new Date(Date.UTC(anio, mes, 0, 23, 59, 59, 999));
+            if (fechaFin > ahora) {
+                fechaFin = new Date(ahora);
+            }
+            mesSeleccionado = { mes, anio };
+        } else {
+            // Compatibilidad: mantener comportamiento previo de ultimos 30 dias.
+            fechaInicio.setDate(ahora.getDate() - 30);
+            fechaInicio.setHours(0, 0, 0, 0);
+        }
+    }
+
+    return {
+        fechaInicio,
+        fechaFin,
+        mesSeleccionado,
+        usaMesCalendario: !!mesSeleccionado
+    };
+}
+
 router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
     try {
-        const { periodo = 'diario' } = req.query;
+        const { periodo = 'diario', mes, anio } = req.query;
         const ahora = new Date();
 
         const hoy = new Date(ahora);
@@ -56,17 +94,9 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
         semana.setHours(0, 0, 0, 0);
         const semanaStr = semana.toISOString();
 
-        let fechaInicio = new Date();
-        if (periodo === 'diario') {
-            fechaInicio.setHours(0, 0, 0, 0);
-        } else if (periodo === 'semanal') {
-            fechaInicio.setDate(ahora.getDate() - 7);
-            fechaInicio.setHours(0, 0, 0, 0);
-        } else if (periodo === 'mensual') {
-            fechaInicio.setDate(ahora.getDate() - 30);
-            fechaInicio.setHours(0, 0, 0, 0);
-        }
+        const { fechaInicio, fechaFin, mesSeleccionado, usaMesCalendario } = construirRangoPeriodo(periodo, ahora, mes, anio);
         const fechaInicioStr = fechaInicio.toISOString();
+        const fechaFinStr = fechaFin.toISOString();
         const ahoraStr = ahora.toISOString();
 
         const prospectors = await db.prepare('SELECT id, nombre, email as correo FROM usuarios WHERE rol = ? AND activo = 1 AND usuario != ?').all('prospector', 'julioagk');
@@ -75,19 +105,19 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const row1 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ?').get(prospectorId);
             const clientesTotales = row1.c;
 
-            const row2 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))').get(prospectorId, fechaInicioStr, fechaInicioStr);
+            const row2 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND ((fechaRegistro >= ? AND fechaRegistro <= ?) OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa <= ?))').get(prospectorId, fechaInicioStr, fechaFinStr, fechaInicioStr, fechaFinStr);
             const clientesNuevos = row2.c;
 
-            const actividades = await db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?').all(prospectorId, fechaInicioStr, ahoraStr);
+            const actividades = await db.prepare('SELECT * FROM actividades WHERE vendedor = ? AND fecha >= ? AND fecha <= ?').all(prospectorId, fechaInicioStr, fechaFinStr);
 
             const llamadas = actividades.filter(a => a.tipo === 'llamada');
             const llamadasExitosas = llamadas.filter(a => a.resultado === 'exitoso');
             const mensajes = actividades.filter(a => ['mensaje', 'correo', 'whatsapp'].includes(a.tipo));
 
-            const row3 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ? AND fechaUltimaEtapa >= ?').get(prospectorId, 'reunion_agendada', fechaInicioStr);
+            const row3 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ? AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa <= ?').get(prospectorId, 'reunion_agendada', fechaInicioStr, fechaFinStr);
             const citasAgendadas = row3.c;
 
-            const row4 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND closerAsignado IS NOT NULL AND fechaTransferencia >= ?').get(prospectorId, fechaInicioStr);
+            const row4 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND closerAsignado IS NOT NULL AND fechaTransferencia >= ? AND fechaTransferencia <= ?').get(prospectorId, fechaInicioStr, fechaFinStr);
             const transferencias = row4.c;
 
             const rendimiento = calcularEstado(llamadas.length, citasAgendadas, periodo);
@@ -292,7 +322,9 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
         res.json({
             periodo,
             fechaInicio: fechaInicioStr,
-            fechaFin: ahoraStr,
+            fechaFin: fechaFinStr,
+            usaMesCalendario,
+            mesSeleccionado,
             totalProspectors: prospectorsConMetricas.length,
             prospectors: prospectorsConMetricas,
             metas: {
@@ -311,7 +343,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 router.get('/monitoring/:prospectorId/prospectos', [auth, esCloserOAdmin], async (req, res) => {
     try {
         const { prospectorId } = req.params;
-        const { periodo = 'diario' } = req.query;
+        const { periodo = 'diario', mes, anio } = req.query;
         const ahora = new Date();
 
         let prospectos;
@@ -323,23 +355,15 @@ router.get('/monitoring/:prospectorId/prospectos', [auth, esCloserOAdmin], async
                 ORDER BY COALESCE(fechaRegistro, fechaUltimaEtapa) DESC
             `).all(parseInt(prospectorId));
         } else {
-            let fechaInicio = new Date();
-            if (periodo === 'diario') {
-                fechaInicio.setHours(0, 0, 0, 0);
-            } else if (periodo === 'semanal') {
-                fechaInicio.setDate(ahora.getDate() - 7);
-                fechaInicio.setHours(0, 0, 0, 0);
-            } else if (periodo === 'mensual') {
-                fechaInicio.setDate(ahora.getDate() - 30);
-                fechaInicio.setHours(0, 0, 0, 0);
-            }
+            const { fechaInicio, fechaFin } = construirRangoPeriodo(periodo, ahora, mes, anio);
             const fechaInicioStr = fechaInicio.toISOString();
+            const fechaFinStr = fechaFin.toISOString();
             prospectos = await db.prepare(`
                 SELECT id, nombres, apellidoPaterno, apellidoMaterno, telefono, correo, empresa, etapaEmbudo, fechaRegistro
                 FROM clientes
-                WHERE prospectorAsignado = ? AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))
+                WHERE prospectorAsignado = ? AND ((fechaRegistro >= ? AND fechaRegistro <= ?) OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa <= ?))
                 ORDER BY COALESCE(fechaRegistro, fechaUltimaEtapa) DESC
-            `).all(parseInt(prospectorId), fechaInicioStr, fechaInicioStr);
+            `).all(parseInt(prospectorId), fechaInicioStr, fechaFinStr, fechaInicioStr, fechaFinStr);
         }
 
         res.json({ prospectos });

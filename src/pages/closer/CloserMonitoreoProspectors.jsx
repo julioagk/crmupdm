@@ -6,9 +6,12 @@ import API_URL from '../../config/api';
 import socket from '../../config/socket';
 
 const CloserMonitoreoProspectors = () => {
+    const fechaActual = new Date();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [periodo, setPeriodo] = useState('diario');
+    const [mesSeleccionado, setMesSeleccionado] = useState(fechaActual.getMonth() + 1);
+    const [anioSeleccionado, setAnioSeleccionado] = useState(fechaActual.getFullYear());
     const [usandoMock, setUsandoMock] = useState(false);
     const [selectedProspectorId, setSelectedProspectorId] = useState(null);
     const [viewMode, setViewMode] = useState('cards');
@@ -18,6 +21,32 @@ const CloserMonitoreoProspectors = () => {
     const [detailProspectos, setDetailProspectos] = useState({ loading: false, todos: [], semana: [] });
     const [expandedTimelineItems, setExpandedTimelineItems] = useState(new Set());
     const [filtroTimeline, setFiltroTimeline] = useState('hoy');
+
+    const meses = [
+        { value: 1, label: 'Enero' },
+        { value: 2, label: 'Febrero' },
+        { value: 3, label: 'Marzo' },
+        { value: 4, label: 'Abril' },
+        { value: 5, label: 'Mayo' },
+        { value: 6, label: 'Junio' },
+        { value: 7, label: 'Julio' },
+        { value: 8, label: 'Agosto' },
+        { value: 9, label: 'Septiembre' },
+        { value: 10, label: 'Octubre' },
+        { value: 11, label: 'Noviembre' },
+        { value: 12, label: 'Diciembre' },
+    ];
+
+    const aniosDisponibles = [fechaActual.getFullYear(), fechaActual.getFullYear() - 1, fechaActual.getFullYear() - 2];
+
+    const getMonitoringParams = (periodoParam = periodo) => {
+        const params = { periodo: periodoParam };
+        if (periodoParam === 'mensual') {
+            params.mes = mesSeleccionado;
+            params.anio = anioSeleccionado;
+        }
+        return params;
+    };
 
     const seleccionarProspector = (id) => { setSelectedProspectorId(id); setFiltroTimeline('hoy'); };
 
@@ -101,7 +130,7 @@ const CloserMonitoreoProspectors = () => {
         try {
             const response = await axios.get(
                 `${API_URL}/api/closer/prospectors/monitoring/${prospectorId}/prospectos`,
-                { params: { periodo }, headers: { 'x-auth-token': localStorage.getItem('token') } }
+                { params: getMonitoringParams(periodo), headers: { 'x-auth-token': localStorage.getItem('token') } }
             );
             setProspectosData(prev => ({ ...prev, [prospectorId]: { loading: false, prospectos: response.data.prospectos || [] } }));
         } catch (err) {
@@ -114,7 +143,7 @@ const CloserMonitoreoProspectors = () => {
         if (!silent) setLoading(true);
         try {
             const response = await axios.get(`${API_URL}/api/closer/prospectors/monitoring`, {
-                params: { periodo },
+                params: getMonitoringParams(periodo),
                 headers: { 'x-auth-token': localStorage.getItem('token') }
             });
             setData(response.data);
@@ -140,7 +169,7 @@ const CloserMonitoreoProspectors = () => {
             clearInterval(interval);
             socket.off('prospectos_actualizados');
         };
-    }, [periodo]);
+    }, [periodo, mesSeleccionado, anioSeleccionado]);
 
     useEffect(() => {
         if (!selectedProspectorId) {
@@ -254,6 +283,28 @@ const CloserMonitoreoProspectors = () => {
                                     </button>
                                 ))}
                             </div>
+                            {periodo === 'mensual' && (
+                                <div className="flex items-center gap-1">
+                                    <select
+                                        value={mesSeleccionado}
+                                        onChange={(e) => setMesSeleccionado(Number.parseInt(e.target.value, 10))}
+                                        className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
+                                    >
+                                        {meses.map((mes) => (
+                                            <option key={mes.value} value={mes.value}>{mes.label}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={anioSeleccionado}
+                                        onChange={(e) => setAnioSeleccionado(Number.parseInt(e.target.value, 10))}
+                                        className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
+                                    >
+                                        {aniosDisponibles.map((anio) => (
+                                            <option key={anio} value={anio}>{anio}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <span className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold capitalize ${estadoBadge}`}>
                                 {getEstadoIcon(rendimientoHist.estado)}
                                 {rendimientoHist.estado}
@@ -533,6 +584,28 @@ const CloserMonitoreoProspectors = () => {
                             </button>
                         ))}
                     </div>
+                    {periodo === 'mensual' && (
+                        <div className="flex items-center gap-1">
+                            <select
+                                value={mesSeleccionado}
+                                onChange={(e) => setMesSeleccionado(Number.parseInt(e.target.value, 10))}
+                                className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
+                            >
+                                {meses.map((mes) => (
+                                    <option key={mes.value} value={mes.value}>{mes.label}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={anioSeleccionado}
+                                onChange={(e) => setAnioSeleccionado(Number.parseInt(e.target.value, 10))}
+                                className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
+                            >
+                                {aniosDisponibles.map((anio) => (
+                                    <option key={anio} value={anio}>{anio}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     {/* Vista */}
                     <div className="flex bg-gray-100 rounded-xl p-0.5 gap-0.5">
                         <button onClick={() => setViewMode('cards')} className={`px-2.5 py-1.5 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
