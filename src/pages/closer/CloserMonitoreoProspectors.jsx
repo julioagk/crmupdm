@@ -253,8 +253,8 @@ const CloserMonitoreoProspectors = () => {
             <div className="h-full flex flex-col p-4 gap-3 overflow-hidden">
                 {/* Header compacto */}
                 <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl px-4 py-3 shadow-sm flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
                             <button
                                 onClick={() => setSelectedProspectorId(null)}
                                 className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
@@ -270,7 +270,7 @@ const CloserMonitoreoProspectors = () => {
                                 <p className="text-xs text-gray-400">{selectedItem.prospector.correo}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2 lg:gap-3">
                             {/* Filtro período */}
                             <div className="flex bg-gray-100 rounded-xl p-0.5 gap-0.5">
                                 {[['diario', 'Hoy'], ['semanal', 'Semana'], ['mensual', 'Mes']].map(([val, lbl]) => (
@@ -283,28 +283,29 @@ const CloserMonitoreoProspectors = () => {
                                     </button>
                                 ))}
                             </div>
-                            {periodo === 'mensual' && (
-                                <div className="flex items-center gap-1">
-                                    <select
-                                        value={mesSeleccionado}
-                                        onChange={(e) => setMesSeleccionado(Number.parseInt(e.target.value, 10))}
-                                        className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
-                                    >
-                                        {meses.map((mes) => (
-                                            <option key={mes.value} value={mes.value}>{mes.label}</option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={anioSeleccionado}
-                                        onChange={(e) => setAnioSeleccionado(Number.parseInt(e.target.value, 10))}
-                                        className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
-                                    >
-                                        {aniosDisponibles.map((anio) => (
-                                            <option key={anio} value={anio}>{anio}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                            <div className={`flex items-center gap-1 rounded-xl border px-1.5 py-1 ${periodo === 'mensual' ? 'border-green-200 bg-green-50/70' : 'border-gray-200 bg-gray-50'}`}>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Mes</span>
+                                <select
+                                    value={mesSeleccionado}
+                                    onChange={(e) => setMesSeleccionado(Number.parseInt(e.target.value, 10))}
+                                    disabled={periodo !== 'mensual'}
+                                    className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                                >
+                                    {meses.map((mes) => (
+                                        <option key={mes.value} value={mes.value}>{mes.label}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={anioSeleccionado}
+                                    onChange={(e) => setAnioSeleccionado(Number.parseInt(e.target.value, 10))}
+                                    disabled={periodo !== 'mensual'}
+                                    className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                                >
+                                    {aniosDisponibles.map((anio) => (
+                                        <option key={anio} value={anio}>{anio}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <span className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold capitalize ${estadoBadge}`}>
                                 {getEstadoIcon(rendimientoHist.estado)}
                                 {rendimientoHist.estado}
@@ -560,8 +561,8 @@ const CloserMonitoreoProspectors = () => {
     return (
         <div className="h-full flex flex-col p-4 gap-3 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between flex-shrink-0">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
                     <Users className="w-5 h-5 text-green-600" />
                     <div>
                         <h1 className="text-lg font-bold text-gray-900 leading-tight">Monitoreo de Prospectors</h1>
@@ -571,7 +572,7 @@ const CloserMonitoreoProspectors = () => {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {/* Período */}
                     <div className="flex bg-gray-100 rounded-xl p-0.5 gap-0.5">
                         {[['diario', 'Hoy'], ['semanal', 'Semana'], ['mensual', 'Mes']].map(([val, lbl]) => (
@@ -584,28 +585,29 @@ const CloserMonitoreoProspectors = () => {
                             </button>
                         ))}
                     </div>
-                    {periodo === 'mensual' && (
-                        <div className="flex items-center gap-1">
-                            <select
-                                value={mesSeleccionado}
-                                onChange={(e) => setMesSeleccionado(Number.parseInt(e.target.value, 10))}
-                                className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
-                            >
-                                {meses.map((mes) => (
-                                    <option key={mes.value} value={mes.value}>{mes.label}</option>
-                                ))}
-                            </select>
-                            <select
-                                value={anioSeleccionado}
-                                onChange={(e) => setAnioSeleccionado(Number.parseInt(e.target.value, 10))}
-                                className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700"
-                            >
-                                {aniosDisponibles.map((anio) => (
-                                    <option key={anio} value={anio}>{anio}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                    <div className={`flex items-center gap-1 rounded-xl border px-1.5 py-1 ${periodo === 'mensual' ? 'border-green-200 bg-green-50/70' : 'border-gray-200 bg-gray-50'}`}>
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Mes</span>
+                        <select
+                            value={mesSeleccionado}
+                            onChange={(e) => setMesSeleccionado(Number.parseInt(e.target.value, 10))}
+                            disabled={periodo !== 'mensual'}
+                            className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                            {meses.map((mes) => (
+                                <option key={mes.value} value={mes.value}>{mes.label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={anioSeleccionado}
+                            onChange={(e) => setAnioSeleccionado(Number.parseInt(e.target.value, 10))}
+                            disabled={periodo !== 'mensual'}
+                            className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                            {aniosDisponibles.map((anio) => (
+                                <option key={anio} value={anio}>{anio}</option>
+                            ))}
+                        </select>
+                    </div>
                     {/* Vista */}
                     <div className="flex bg-gray-100 rounded-xl p-0.5 gap-0.5">
                         <button onClick={() => setViewMode('cards')} className={`px-2.5 py-1.5 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
