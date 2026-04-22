@@ -48,11 +48,16 @@ function construirIdentificadorContacto(row) {
         .map(v => String(v).trim())
         .filter(Boolean)
         .join(' ');
+    const empresa = String(row.empresaCliente || '').trim();
     const correo = String(row.correoCliente || '').trim();
     const telefono = String(row.telefonoCliente || '').trim();
 
+    if (nombre && empresa && correo) return `${nombre} - ${empresa} (${correo})`;
+    if (nombre && empresa) return `${nombre} - ${empresa}`;
     if (nombre && correo) return `${nombre} (${correo})`;
+    if (empresa && correo) return `${empresa} (${correo})`;
     if (nombre) return nombre;
+    if (empresa) return empresa;
     if (correo) return correo;
     if (telefono) return telefono;
     return 'Contacto sin nombre, correo ni telefono';
@@ -151,7 +156,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Hoy
             const actsHoy = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente, c.telefono as telefonoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.empresa as empresaCliente, c.correo as correoCliente, c.telefono as telefonoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -224,7 +229,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Semana — with JOIN for names
             const actsSemana = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente, c.telefono as telefonoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.empresa as empresaCliente, c.correo as correoCliente, c.telefono as telefonoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -278,7 +283,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // Timeline for "todo" (last 200 activities, no date filter)
             const actsTodo = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente, c.telefono as telefonoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.empresa as empresaCliente, c.correo as correoCliente, c.telefono as telefonoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ?
