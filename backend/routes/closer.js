@@ -4,6 +4,27 @@ const { db, isPostgres } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
 
+function construirEtiquetaContacto(cliente) {
+    const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
+        .filter(Boolean)
+        .map(v => String(v).trim())
+        .filter(Boolean)
+        .join(' ');
+    const empresa = String(cliente?.empresa || '').trim();
+    const correo = String(cliente?.correo || '').trim();
+    const telefono = String(cliente?.telefono || '').trim();
+
+    if (nombre && empresa && correo) return `${nombre} - ${empresa} (${correo})`;
+    if (nombre && empresa) return `${nombre} - ${empresa}`;
+    if (nombre && correo) return `${nombre} (${correo})`;
+    if (empresa && correo) return `${empresa} (${correo})`;
+    if (nombre) return nombre;
+    if (empresa) return empresa;
+    if (correo) return correo;
+    if (telefono) return telefono;
+    return 'Contacto sin nombre, correo ni telefono';
+}
+
 const esCloser = (req, res, next) => {
     if (req.usuario.rol !== 'closer') {
         return res.status(403).json({ msg: 'Acceso denegado. Solo closers.' });
@@ -752,6 +773,7 @@ router.get('/prospecto/:id/historial-completo', auth, async (req, res) => {
                 vendedorId: a.vendedor,
                 vendedorNombre: a.vendedorNombre || 'Desconocido',
                 vendedorRol: a.vendedorRol || 'vendedor',
+                prospecto: construirEtiquetaContacto(cliente),
                 descripcion: a.descripcion,
                 resultado: a.resultado,
                 notas: a.notas

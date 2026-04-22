@@ -260,6 +260,11 @@ export const HistorialInteracciones = ({ timeline = [], esProspector = true, onD
                                                     Por: <span className="font-medium">{item.vendedorNombre}</span>
                                                 </p>
                                             )}
+                                            {item.tipo !== 'cambio_etapa' && item.prospecto && (
+                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                    Contacto: <span className="font-medium">{item.prospecto}</span>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">

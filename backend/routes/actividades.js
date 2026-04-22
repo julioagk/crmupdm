@@ -4,6 +4,27 @@ const { db } = require('../config/database');
 const { auth, esSuperUser } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
 
+function construirEtiquetaContacto(cliente) {
+    const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
+        .filter(Boolean)
+        .map(v => String(v).trim())
+        .filter(Boolean)
+        .join(' ');
+    const empresa = String(cliente?.empresa || '').trim();
+    const correo = String(cliente?.correo || '').trim();
+    const telefono = String(cliente?.telefono || '').trim();
+
+    if (nombre && empresa && correo) return `${nombre} - ${empresa} (${correo})`;
+    if (nombre && empresa) return `${nombre} - ${empresa}`;
+    if (nombre && correo) return `${nombre} (${correo})`;
+    if (empresa && correo) return `${empresa} (${correo})`;
+    if (nombre) return nombre;
+    if (empresa) return empresa;
+    if (correo) return correo;
+    if (telefono) return telefono;
+    return 'Contacto sin nombre, correo ni telefono';
+}
+
 // GET /api/actividades/cliente/:clienteId/historial-completo
 // Nuevo: obtener historial COMPLETO de un cliente incluyendo etapas y actividades
 router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
@@ -72,6 +93,7 @@ router.get('/cliente/:clienteId/historial-completo', auth, async (req, res) => {
                 vendedorId: a.vendedor,
                 vendedorNombre: a.vendedorNombre || 'Desconocido',
                 vendedorRol: a.vendedorRol || 'vendedor',
+                prospecto: construirEtiquetaContacto(cliente),
                 descripcion: a.descripcion,
                 resultado: a.resultado,
                 notas: a.notas,
