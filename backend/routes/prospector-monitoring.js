@@ -42,6 +42,20 @@ function getDescripcionEstado(estado) {
     return descripciones[estado] || 'Estado desconocido';
 }
 
+function construirIdentificadorContacto(row) {
+    const nombre = [row.nombres, row.apellidoPaterno, row.apellidoMaterno]
+        .filter(Boolean)
+        .map(v => String(v).trim())
+        .filter(Boolean)
+        .join(' ');
+    const correo = String(row.correoCliente || '').trim();
+
+    if (nombre && correo) return `${nombre} (${correo})`;
+    if (nombre) return nombre;
+    if (correo) return correo;
+    return 'Contacto sin nombre ni correo';
+}
+
 function construirRangoPeriodo(periodo, ahora, mesParam, anioParam) {
     let fechaInicio = new Date(ahora);
     let fechaFin = new Date(ahora);
@@ -135,7 +149,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Hoy
             const actsHoy = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.correo as correoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -176,7 +190,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 descripcion: a.descripcion || null,
                 resultado: a.resultado || null,
                 notas: a.notas || null,
-                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || a.correoCliente || null,
+                prospecto: construirIdentificadorContacto(a),
             }));
 
             const timelineProspectos = prospectosHoyConNombre.map(p => ({
@@ -208,7 +222,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Semana — with JOIN for names
             const actsSemana = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.correo as correoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -247,7 +261,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 descripcion: a.descripcion || null,
                 resultado: a.resultado || null,
                 notas: a.notas || null,
-                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || a.correoCliente || null,
+                prospecto: construirIdentificadorContacto(a),
             }));
             const timelineProspectosSemana = prospectosSemanaConNombre.map(p => ({
                 tipo: 'prospecto_registrado',
@@ -262,7 +276,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // Timeline for "todo" (last 200 activities, no date filter)
             const actsTodo = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.correo as correoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ?
@@ -276,7 +290,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 descripcion: a.descripcion || null,
                 resultado: a.resultado || null,
                 notas: a.notas || null,
-                prospecto: [a.nombres, a.apellidoPaterno].filter(Boolean).join(' ') || a.correoCliente || null,
+                prospecto: construirIdentificadorContacto(a),
             })).filter(e => e.fecha);
 
             const detalleSemana = {
