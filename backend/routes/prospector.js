@@ -723,7 +723,11 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
 
                 const attendeesList = [{ email: closerDetails.email }];
                 if (cliente.correo && cliente.correo.trim() !== '') {
-                    attendeesList.push({ email: cliente.correo });
+                    const correosCliente = String(cliente.correo)
+                        .split(',')
+                        .map(e => e.trim())
+                        .filter(Boolean);
+                    correosCliente.forEach(email => attendeesList.push({ email }));
                 }
 
                 const event = {

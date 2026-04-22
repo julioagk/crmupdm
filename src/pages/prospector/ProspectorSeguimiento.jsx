@@ -116,6 +116,11 @@ const ETAPAS_EMBUDO = {
 const getEtapaLabel = (etapa) => ETAPAS_EMBUDO[etapa]?.label || etapa;
 const getEtapaColor = (etapa) => ETAPAS_EMBUDO[etapa]?.color || 'bg-gray-100 text-gray-600';
 
+const parseListaCorreos = (correoRaw) => String(correoRaw || '')
+    .split(',')
+    .map(c => c.trim())
+    .filter(Boolean);
+
 const ProspectorSeguimiento = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -137,7 +142,7 @@ const ProspectorSeguimiento = () => {
         apellidoPaterno: '',
         apellidoMaterno: '',
         telefonos: [''],
-        correo: '',
+        correos: [''],
         empresa: '',
         sitioWeb: '',
         ubicacion: '',
@@ -190,13 +195,14 @@ const ProspectorSeguimiento = () => {
 
     const abrirModalEditar = (p) => {
         const tels = [p.telefono, p.telefono2].filter(Boolean);
+        const correos = parseListaCorreos(p.correo);
         setProspectoAEditar({
             id: p._id || p.id,
             nombres: p.nombres || '',
             apellidoPaterno: p.apellidoPaterno || '',
             apellidoMaterno: p.apellidoMaterno || '',
             telefonos: tels.length > 0 ? tels : [''],
-            correo: p.correo || '',
+            correos: correos.length > 0 ? correos : [''],
             empresa: p.empresa || '',
             sitioWeb: p.sitioWeb || '',
             ubicacion: p.ubicacion || '',
@@ -211,8 +217,15 @@ const ProspectorSeguimiento = () => {
         setLoadingEditar(true);
         try {
             const telefonosLimpios = (prospectoAEditar.telefonos || []).filter(t => t.trim());
-            const payload = { ...prospectoAEditar, telefono: telefonosLimpios[0] || '', telefono2: telefonosLimpios.slice(1).join(', ') || '' };
+            const correosLimpios = (prospectoAEditar.correos || []).filter(c => c.trim());
+            const payload = {
+                ...prospectoAEditar,
+                telefono: telefonosLimpios[0] || '',
+                telefono2: telefonosLimpios.slice(1).join(', ') || '',
+                correo: correosLimpios.join(', ')
+            };
             delete payload.telefonos;
+            delete payload.correos;
             await axios.put(`${API_URL}/api/${rolePath}/prospectos/${prospectoAEditar.id}/editar`, payload, {
                 headers: getAuthHeaders()
             });
@@ -493,14 +506,21 @@ const ProspectorSeguimiento = () => {
         setLoadingCrear(true);
         try {
             const telefonosLimpios = formCrear.telefonos.filter(t => t.trim());
-            const payload = { ...formCrear, telefono: telefonosLimpios[0] || '', telefono2: telefonosLimpios.slice(1).join(', ') || '' };
+            const correosLimpios = (formCrear.correos || []).filter(c => c.trim());
+            const payload = {
+                ...formCrear,
+                telefono: telefonosLimpios[0] || '',
+                telefono2: telefonosLimpios.slice(1).join(', ') || '',
+                correo: correosLimpios.join(', ')
+            };
             delete payload.telefonos;
+            delete payload.correos;
             await axios.post(`${API_URL}/api/${rolePath}/crear-prospecto`, payload, {
                 headers: getAuthHeaders()
             });
             toast.success('Prospecto creado');
             setModalCrearAbierto(false);
-            setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefonos: [''], correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
+            setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefonos: [''], correos: [''], empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
             cargarDatos();
         } catch (error) {
             toast.error(error.response?.data?.msg || 'Error al crear');
@@ -663,14 +683,38 @@ const ProspectorSeguimiento = () => {
                                     </div>
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Correo</label>
-                                    <input
-                                        type="email"
-                                        value={formCrear.correo}
-                                        onChange={(e) => setFormCrear((f) => ({ ...f, correo: e.target.value }))}
-                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
-                                        placeholder="correo@ejemplo.com"
-                                    />
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-xs font-medium text-gray-700">Correos</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormCrear((f) => ({ ...f, correos: [...(f.correos || ['']), ''] }))}
+                                            className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Agregar
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {(formCrear.correos || ['']).map((correo, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center">
+                                                <input
+                                                    type="email"
+                                                    value={correo}
+                                                    onChange={(e) => setFormCrear((f) => { const c = [...(f.correos || [''])]; c[idx] = e.target.value; return { ...f, correos: c }; })}
+                                                    className="flex-1 border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                                    placeholder="correo@ejemplo.com"
+                                                />
+                                                {(formCrear.correos || ['']).length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormCrear((f) => ({ ...f, correos: (f.correos || ['']).filter((_, i) => i !== idx) }))}
+                                                        className="text-red-400 hover:text-red-600"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Empresa</label>
@@ -718,7 +762,7 @@ const ProspectorSeguimiento = () => {
                             <button
                                 onClick={() => {
                                     setModalCrearAbierto(false);
-                                    setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefonos: [''], correo: '', empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
+                                    setFormCrear({ nombres: '', apellidoPaterno: '', apellidoMaterno: '', telefonos: [''], correos: [''], empresa: '', sitioWeb: '', ubicacion: '', notas: '' });
                                 }}
                                 className="flex-1 px-3 py-2 border border-slate-200 text-gray-700 rounded text-sm hover:bg-slate-50 font-medium"
                             >
@@ -797,13 +841,38 @@ const ProspectorSeguimiento = () => {
                                     </div>
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Correo</label>
-                                    <input
-                                        type="email"
-                                        value={prospectoAEditar.correo}
-                                        onChange={(e) => setProspectoAEditar((f) => ({ ...f, correo: e.target.value }))}
-                                        className="w-full border border-slate-200 rounded px-3 py-1.5 text-sm"
-                                    />
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-xs font-medium text-gray-700">Correos</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setProspectoAEditar((f) => ({ ...f, correos: [...(f.correos || ['']), ''] }))}
+                                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Agregar
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {(prospectoAEditar.correos || ['']).map((correo, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center">
+                                                <input
+                                                    type="email"
+                                                    value={correo}
+                                                    onChange={(e) => setProspectoAEditar((f) => { const c = [...(f.correos || [''])]; c[idx] = e.target.value; return { ...f, correos: c }; })}
+                                                    className="flex-1 border border-slate-200 rounded px-3 py-1.5 text-sm"
+                                                    placeholder="correo@ejemplo.com"
+                                                />
+                                                {(prospectoAEditar.correos || ['']).length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setProspectoAEditar((f) => ({ ...f, correos: (f.correos || ['']).filter((_, i) => i !== idx) }))}
+                                                        className="text-red-400 hover:text-red-600"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Empresa</label>
@@ -1226,9 +1295,9 @@ const ProspectorSeguimiento = () => {
                                             {[prospectoSeleccionado.telefono, prospectoSeleccionado.telefono2].filter(Boolean).flatMap(t => t.split(',').map(s => s.trim())).filter(Boolean).map((tel, idx) => (
                                                 <span key={idx} className="flex items-center gap-1"><Phone className="w-4 h-4" /> {tel}</span>
                                             ))}
-                                            {prospectoSeleccionado.correo && (
-                                                <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> {prospectoSeleccionado.correo}</span>
-                                            )}
+                                            {parseListaCorreos(prospectoSeleccionado.correo).map((correo, idx) => (
+                                                <span key={idx} className="flex items-center gap-1"><Mail className="w-4 h-4" /> {correo}</span>
+                                            ))}
                                         </div>
                                     </div>
                                     {/* Interés (estrellas) */}
