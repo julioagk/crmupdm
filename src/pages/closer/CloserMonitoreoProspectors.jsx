@@ -17,8 +17,8 @@ const CloserMonitoreoProspectors = () => {
     const [viewMode, setViewMode] = useState('cards');
     const [expandedRows, setExpandedRows] = useState(new Set());
     const [prospectosData, setProspectosData] = useState({});
-    const [filtroLista, setFiltroLista] = useState('todos'); // 'todos' | 'semana' | 'hoy'
-    const [detailProspectos, setDetailProspectos] = useState({ loading: false, todos: [], semana: [] });
+    const [filtroLista, setFiltroLista] = useState('todos'); // 'todos' | 'semana' | 'hoy' | 'mes'
+    const [detailProspectos, setDetailProspectos] = useState({ loading: false, todos: [], semana: [], mes: [] });
     const [expandedTimelineItems, setExpandedTimelineItems] = useState(new Set());
     const [filtroTimeline, setFiltroTimeline] = useState('hoy');
 
@@ -173,7 +173,7 @@ const CloserMonitoreoProspectors = () => {
 
     useEffect(() => {
         if (!selectedProspectorId) {
-            setDetailProspectos({ loading: false, todos: [], semana: [] });
+            setDetailProspectos({ loading: false, todos: [], semana: [], mes: [] });
             return;
         }
         const headers = { 'x-auth-token': localStorage.getItem('token') };
@@ -181,17 +181,19 @@ const CloserMonitoreoProspectors = () => {
         Promise.all([
             axios.get(`${API_URL}/api/closer/prospectors/monitoring/${selectedProspectorId}/prospectos`, { params: { periodo: 'todos' }, headers }),
             axios.get(`${API_URL}/api/closer/prospectors/monitoring/${selectedProspectorId}/prospectos`, { params: { periodo: 'semanal' }, headers }),
-        ]).then(([rTodos, rSemana]) => {
+            axios.get(`${API_URL}/api/closer/prospectors/monitoring/${selectedProspectorId}/prospectos`, { params: { periodo: 'mensual', mes: mesSeleccionado, anio: anioSeleccionado }, headers }),
+        ]).then(([rTodos, rSemana, rMes]) => {
             setDetailProspectos({
                 loading: false,
                 todos: rTodos.data.prospectos || [],
                 semana: rSemana.data.prospectos || [],
+                mes: rMes.data.prospectos || [],
             });
         }).catch(err => {
             console.error('Error cargando prospectos del detalle:', err);
-            setDetailProspectos({ loading: false, todos: [], semana: [] });
+            setDetailProspectos({ loading: false, todos: [], semana: [], mes: [] });
         });
-    }, [selectedProspectorId]);
+    }, [selectedProspectorId, mesSeleccionado, anioSeleccionado]);
 
     // Color helpers aligned with system green theme
     const getColorClasses = (color) => {
@@ -362,6 +364,12 @@ const CloserMonitoreoProspectors = () => {
                                     >
                                         Hoy
                                     </button>
+                                    <button
+                                        onClick={() => setFiltroLista('mes')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${filtroLista === 'mes' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        Mes
+                                    </button>
                                 </div>
                             </div>
                             {/* Lista */}
@@ -377,6 +385,7 @@ const CloserMonitoreoProspectors = () => {
                                     const listaHoy = statsHoy.listaProspectosHoy || [];
                                     const lista = filtroLista === 'hoy' ? listaHoy
                                         : filtroLista === 'semana' ? detailProspectos.semana
+                                            : filtroLista === 'mes' ? detailProspectos.mes
                                         : detailProspectos.todos;
                                     if (lista.length === 0) {
                                         return (
@@ -384,6 +393,7 @@ const CloserMonitoreoProspectors = () => {
                                                 <p className="text-gray-400 text-xs italic text-center py-8">
                                                     {filtroLista === 'hoy' ? 'No hay prospectos registrados hoy.'
                                                         : filtroLista === 'semana' ? 'No hay prospectos esta semana.'
+                                                            : filtroLista === 'mes' ? 'No hay prospectos en este mes.'
                                                         : 'No hay prospectos disponibles.'}
                                                 </p>
                                             </div>
@@ -420,11 +430,11 @@ const CloserMonitoreoProspectors = () => {
                         <div className="flex items-center gap-2 shrink-0">
                             <Activity className="w-4 h-4 text-green-600" />
                             <span className="text-sm font-bold text-gray-800">
-                                {filtroTimeline === 'hoy' ? 'Actividad de Hoy' : filtroTimeline === 'semana' ? 'Actividad de la Semana' : 'Todo el Historial'}
+                                {filtroTimeline === 'hoy' ? 'Actividad de Hoy' : filtroTimeline === 'semana' ? 'Actividad de la Semana' : filtroTimeline === 'mes' ? 'Actividad del Mes' : 'Todo el Historial'}
                             </span>
                             {/* Tabs */}
                             <div className="ml-auto flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
-                                {[['hoy','Hoy'],['semana','Semana'],['todo','Todo']].map(([key, label]) => (
+                                {[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['todo','Todo']].map(([key, label]) => (
                                     <button key={key} onClick={() => setFiltroTimeline(key)}
                                         className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
                                             filtroTimeline === key ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -442,10 +452,12 @@ const CloserMonitoreoProspectors = () => {
                                     timeline = statsHoy.actividadesTimeline || [];
                                 } else if (filtroTimeline === 'semana') {
                                     timeline = statsDetalle.detalleSemana?.actividadesTimeline || [];
+                                } else if (filtroTimeline === 'mes') {
+                                    timeline = statsDetalle.detalleMes?.actividadesTimeline || [];
                                 } else {
                                     timeline = statsDetalle.detalleSemana?.actividadesTimelineTodo || [];
                                 }
-                                const labelVacio = filtroTimeline === 'hoy' ? 'Sin actividad registrada hoy' : filtroTimeline === 'semana' ? 'Sin actividad esta semana' : 'Sin actividad registrada';
+                                const labelVacio = filtroTimeline === 'hoy' ? 'Sin actividad registrada hoy' : filtroTimeline === 'semana' ? 'Sin actividad esta semana' : filtroTimeline === 'mes' ? 'Sin actividad en este mes' : 'Sin actividad registrada';
                                 if (timeline.length === 0) {
                                     return (
                                         <div className="flex flex-col items-center justify-center h-full gap-2 py-6">

@@ -119,6 +119,9 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
         const fechaInicioStr = fechaInicio.toISOString();
         const fechaFinStr = fechaFin.toISOString();
         const ahoraStr = ahora.toISOString();
+        const { fechaInicio: inicioMesFiltro, fechaFin: finMesFiltro } = construirRangoPeriodo('mensual', ahora, mes, anio);
+        const mesInicioStr = inicioMesFiltro.toISOString();
+        const mesFinStr = finMesFiltro.toISOString();
 
         const prospectors = await db.prepare('SELECT id, nombre, email as correo FROM usuarios WHERE rol = ? AND activo = 1 AND usuario != ?').all('prospector', 'julioagk');
         const prospectorsConMetricas = await Promise.all(prospectors.map(async (prospector) => {
@@ -316,6 +319,77 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 color: rendimientoSemana.color
             };
 
+            // NEW DETAILED METRICS for Mes (filtro mensual seleccionado o mes actual)
+            const actsMes = await db.prepare(`
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.empresa as "empresaCliente", c.correo as "correoCliente", c.telefono as "telefonoCliente"
+                FROM actividades a
+                LEFT JOIN clientes c ON c.id = a.cliente
+                WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
+            `).all(prospectorId, mesInicioStr, mesFinStr);
+
+            const llamadasMes = actsMes.filter(a => a.tipo === 'llamada');
+            const llamadasExitosasMes = llamadasMes.filter(a => a.resultado === 'exitoso');
+            const mensajesMes = actsMes.filter(a => ['mensaje', 'correo', 'whatsapp'].includes(a.tipo));
+
+            const row11 = await db.prepare('SELECT COUNT(*) as c FROM clientes WHERE prospectorAsignado = ? AND etapaEmbudo = ? AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa <= ?').get(prospectorId, 'reunion_agendada', mesInicioStr, mesFinStr);
+            const citasMes = row11.c;
+
+            const prospectosMesRaw = await db.prepare(`
+                SELECT id, nombres, apellidoPaterno, correo, etapaEmbudo, closerAsignado, fechaRegistro
+                FROM clientes
+                WHERE prospectorAsignado = ?
+                AND (fechaRegistro >= ? AND fechaRegistro <= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa <= ?))
+            `).all(prospectorId, mesInicioStr, mesFinStr, mesInicioStr, mesFinStr);
+
+            const prospectosRegistradosMes = prospectosMesRaw.length;
+            const prospectosActivosMes = prospectosMesRaw.filter(p => p.etapaEmbudo !== 'perdido' && !p.closerAsignado).length;
+            const prospectosDescartadosMes = prospectosMesRaw.filter(p => p.etapaEmbudo === 'perdido').length;
+            const prospectosTransferidosMes = prospectosMesRaw.filter(p => p.closerAsignado || p.etapaEmbudo === 'reunion_agendada').length;
+
+            const prospectosMesConNombre = prospectosMesRaw.map(p => ({
+                ...p,
+                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'
+            }));
+
+            const rendimientoMes = calcularEstado(llamadasMes.length, citasMes, 'mensual');
+
+            const timelineActsMes = actsMes.map(a => ({
+                tipo: 'actividad',
+                subTipo: a.tipo,
+                fecha: a.fecha,
+                descripcion: a.descripcion || null,
+                resultado: a.resultado || null,
+                notas: a.notas || null,
+                prospecto: construirIdentificadorContacto(a),
+            }));
+
+            const timelineProspectosMes = prospectosMesConNombre.map(p => ({
+                tipo: 'prospecto_registrado',
+                subTipo: 'registro',
+                fecha: p.fechaRegistro || null,
+                nombre: p.nombre || p.correo || null,
+                etapa: p.etapaEmbudo || null,
+            }));
+
+            const actividadesTimelineMes = [...timelineActsMes, ...timelineProspectosMes]
+                .filter(e => e.fecha)
+                .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+            const detalleMes = {
+                llamadas: llamadasMes.length,
+                llamadasExitosas: llamadasExitosasMes.length,
+                mensajes: mensajesMes.length,
+                citasAgendadas: citasMes,
+                prospectosRegistrados: prospectosRegistradosMes,
+                prospectosActivos: prospectosActivosMes,
+                prospectosDescartados: prospectosDescartadosMes,
+                prospectosTransferidos: prospectosTransferidosMes,
+                listaProspectosMes: prospectosMesConNombre,
+                actividadesTimeline: actividadesTimelineMes,
+                estado: rendimientoMes.estado,
+                color: rendimientoMes.color
+            };
+
             return {
                 prospector: { id: String(prospector.id), nombre: prospector.nombre, correo: prospector.correo || '' },
                 metricas: {
@@ -333,7 +407,8 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 },
                 periodo,
                 detalleHoy,
-                detalleSemana
+                detalleSemana,
+                detalleMes
             };
         }));
 
