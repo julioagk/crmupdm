@@ -40,11 +40,11 @@ const CloserMonitoreoProspectors = () => {
     const aniosDisponibles = [fechaActual.getFullYear(), fechaActual.getFullYear() - 1, fechaActual.getFullYear() - 2];
 
     const getMonitoringParams = (periodoParam = periodo) => {
-        const params = { periodo: periodoParam };
-        if (periodoParam === 'mensual') {
-            params.mes = mesSeleccionado;
-            params.anio = anioSeleccionado;
-        }
+        const params = {
+            periodo: periodoParam,
+            mes: mesSeleccionado,
+            anio: anioSeleccionado,
+        };
         return params;
     };
 

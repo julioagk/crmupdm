@@ -87,9 +87,15 @@ function construirRangoPeriodo(periodo, ahora, mesParam, anioParam) {
             }
             mesSeleccionado = { mes, anio };
         } else {
-            // Compatibilidad: mantener comportamiento previo de ultimos 30 dias.
-            fechaInicio.setDate(ahora.getDate() - 30);
-            fechaInicio.setHours(0, 0, 0, 0);
+            // Por defecto, usar siempre mes calendario actual (no ventana movil de 30 dias).
+            const mesActual = ahora.getUTCMonth() + 1;
+            const anioActual = ahora.getUTCFullYear();
+            fechaInicio = new Date(Date.UTC(anioActual, mesActual - 1, 1, 0, 0, 0, 0));
+            fechaFin = new Date(Date.UTC(anioActual, mesActual, 0, 23, 59, 59, 999));
+            if (fechaFin > ahora) {
+                fechaFin = new Date(ahora);
+            }
+            mesSeleccionado = { mes: mesActual, anio: anioActual };
         }
     }
 
