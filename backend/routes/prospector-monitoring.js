@@ -49,11 +49,13 @@ function construirIdentificadorContacto(row) {
         .filter(Boolean)
         .join(' ');
     const correo = String(row.correoCliente || '').trim();
+    const telefono = String(row.telefonoCliente || '').trim();
 
     if (nombre && correo) return `${nombre} (${correo})`;
     if (nombre) return nombre;
     if (correo) return correo;
-    return 'Contacto sin nombre ni correo';
+    if (telefono) return telefono;
+    return 'Contacto sin nombre, correo ni telefono';
 }
 
 function construirRangoPeriodo(periodo, ahora, mesParam, anioParam) {
@@ -149,7 +151,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Hoy
             const actsHoy = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente, c.telefono as telefonoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -222,7 +224,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // NEW DETAILED METRICS for Semana — with JOIN for names
             const actsSemana = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente, c.telefono as telefonoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ? AND a.fecha >= ? AND a.fecha <= ?
@@ -276,7 +278,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // Timeline for "todo" (last 200 activities, no date filter)
             const actsTodo = await db.prepare(`
-                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente
+                SELECT a.*, c.nombres, c.apellidoPaterno, c.apellidoMaterno, c.correo as correoCliente, c.telefono as telefonoCliente
                 FROM actividades a
                 LEFT JOIN clientes c ON c.id = a.cliente
                 WHERE a.vendedor = ?
