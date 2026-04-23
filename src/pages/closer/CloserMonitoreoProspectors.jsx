@@ -117,15 +117,16 @@ const CloserMonitoreoProspectors = () => {
     };
 
     const getProspectDisplayName = (p = {}) => {
-        const nombre = [p.nombre, p.nombres, p.apellidoPaterno, p.apellidoMaterno]
+        const nombreCompleto = [p.nombres, p.apellidoPaterno, p.apellidoMaterno]
             .filter(Boolean)
             .map(v => String(v).trim())
             .filter(Boolean)
             .join(' ');
+        const nombre = String(p.nombre || '').trim();
         const telefono = String(p.telefono || '').trim();
         const correo = String(p.correo || '').trim();
 
-        return nombre || telefono || correo || 'Prospecto sin datos';
+        return nombreCompleto || nombre || correo || telefono || 'Prospecto sin datos';
     };
 
     const toggleProspectos = async (prospectorId) => {

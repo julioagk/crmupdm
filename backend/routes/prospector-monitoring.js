@@ -73,8 +73,8 @@ function construirIdentificadorProspecto(row) {
     const correo = String(row.correo || '').trim();
 
     if (nombre) return nombre;
-    if (telefono) return telefono;
     if (correo) return correo;
+    if (telefono) return telefono;
     return 'Prospecto sin datos';
 }
 
