@@ -58,9 +58,24 @@ function construirIdentificadorContacto(row) {
     if (empresa && correo) return `${empresa} (${correo})`;
     if (nombre) return nombre;
     if (empresa) return empresa;
-    if (correo) return correo;
     if (telefono) return telefono;
-    return 'Contacto sin nombre, correo ni telefono';
+    if (correo) return correo;
+    return 'Contacto sin datos';
+}
+
+function construirIdentificadorProspecto(row) {
+    const nombre = [row.nombres, row.apellidoPaterno, row.apellidoMaterno]
+        .filter(Boolean)
+        .map(v => String(v).trim())
+        .filter(Boolean)
+        .join(' ');
+    const telefono = String(row.telefono || '').trim();
+    const correo = String(row.correo || '').trim();
+
+    if (nombre) return nombre;
+    if (telefono) return telefono;
+    if (correo) return correo;
+    return 'Prospecto sin datos';
 }
 
 function construirRangoPeriodo(periodo, ahora, mesParam, anioParam) {
@@ -179,7 +194,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             // Prospectos registrados HOY
             const prospectosHoyRaw = await db.prepare(`
-                SELECT id, nombres, apellidoPaterno, correo, etapaEmbudo, closerAsignado, fechaRegistro
+                SELECT id, nombres, apellidoPaterno, apellidoMaterno, telefono, correo, etapaEmbudo, closerAsignado, fechaRegistro
                 FROM clientes 
                 WHERE prospectorAsignado = ? 
                 AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))
@@ -193,7 +208,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             // Add a computed 'nombre' field for convenience in the timeline
             const prospectosHoyConNombre = prospectosHoyRaw.map(p => ({
                 ...p,
-                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'
+                nombre: construirIdentificadorProspecto(p)
             }));
 
             const rendimientoHoy = calcularEstado(llamadasHoy.length, citasHoy, 'diario');
@@ -213,7 +228,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 tipo: 'prospecto_registrado',
                 subTipo: 'registro',
                 fecha: p.fechaRegistro || null,
-                nombre: p.nombre || p.correo || null,
+                nombre: p.nombre || construirIdentificadorProspecto(p),
                 etapa: p.etapaEmbudo || null,
             }));
 
@@ -251,7 +266,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const citasSemana = row10.c;
 
             const prospectosSemanaRaw = await db.prepare(`
-                SELECT id, nombres, apellidoPaterno, correo, etapaEmbudo, closerAsignado, fechaRegistro
+                SELECT id, nombres, apellidoPaterno, apellidoMaterno, telefono, correo, etapaEmbudo, closerAsignado, fechaRegistro
                 FROM clientes 
                 WHERE prospectorAsignado = ? 
                 AND (fechaRegistro >= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ?))
@@ -264,7 +279,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             const prospectosSemanaConNombre = prospectosSemanaRaw.map(p => ({
                 ...p,
-                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'
+                nombre: construirIdentificadorProspecto(p)
             }));
 
             const rendimientoSemana = calcularEstado(llamadasSemana.length, citasSemana, 'semanal');
@@ -283,7 +298,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 tipo: 'prospecto_registrado',
                 subTipo: 'registro',
                 fecha: p.fechaRegistro || null,
-                nombre: p.nombre || p.correo || null,
+                nombre: p.nombre || construirIdentificadorProspecto(p),
                 etapa: p.etapaEmbudo || null,
             }));
             const actividadesTimelineSemana = [...timelineActsSemana, ...timelineProspectosSemana]
@@ -341,7 +356,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
             const citasMes = row11.c;
 
             const prospectosMesRaw = await db.prepare(`
-                SELECT id, nombres, apellidoPaterno, correo, etapaEmbudo, closerAsignado, fechaRegistro
+                SELECT id, nombres, apellidoPaterno, apellidoMaterno, telefono, correo, etapaEmbudo, closerAsignado, fechaRegistro
                 FROM clientes
                 WHERE prospectorAsignado = ?
                 AND (fechaRegistro >= ? AND fechaRegistro <= ? OR (fechaRegistro IS NULL AND fechaUltimaEtapa >= ? AND fechaUltimaEtapa <= ?))
@@ -354,7 +369,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
 
             const prospectosMesConNombre = prospectosMesRaw.map(p => ({
                 ...p,
-                nombre: [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'
+                nombre: construirIdentificadorProspecto(p)
             }));
 
             const rendimientoMes = calcularEstado(llamadasMes.length, citasMes, 'mensual');
@@ -373,7 +388,7 @@ router.get('/monitoring', [auth, esCloserOAdmin], async (req, res) => {
                 tipo: 'prospecto_registrado',
                 subTipo: 'registro',
                 fecha: p.fechaRegistro || null,
-                nombre: p.nombre || p.correo || null,
+                nombre: p.nombre || construirIdentificadorProspecto(p),
                 etapa: p.etapaEmbudo || null,
             }));
 

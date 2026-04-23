@@ -116,6 +116,18 @@ const CloserMonitoreoProspectors = () => {
         return etiquetas[etapa] || etapa;
     };
 
+    const getProspectDisplayName = (p = {}) => {
+        const nombre = [p.nombre, p.nombres, p.apellidoPaterno, p.apellidoMaterno]
+            .filter(Boolean)
+            .map(v => String(v).trim())
+            .filter(Boolean)
+            .join(' ');
+        const telefono = String(p.telefono || '').trim();
+        const correo = String(p.correo || '').trim();
+
+        return nombre || telefono || correo || 'Prospecto sin datos';
+    };
+
     const toggleProspectos = async (prospectorId) => {
         const newExpanded = new Set(expandedRows);
         if (newExpanded.has(prospectorId)) {
@@ -400,7 +412,7 @@ const CloserMonitoreoProspectors = () => {
                                         );
                                     }
                                     return lista.map(p => {
-                                        const nombre = p.nombre || [p.nombres, p.apellidoPaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre';
+                                        const nombre = getProspectDisplayName(p);
                                         return (
                                             <div key={p.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100 hover:border-green-200 transition-colors">
                                                 <div className="flex items-center gap-2">
@@ -732,7 +744,7 @@ const CloserMonitoreoProspectors = () => {
                                                 <ul className="divide-y divide-gray-50 max-h-36 overflow-y-auto">
                                                     {pData.prospectos.map((p) => (
                                                         <li key={p.id} className="px-3 py-1.5 hover:bg-gray-50">
-                                                            <p className="font-semibold text-gray-900 text-[11px]">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'}</p>
+                                                            <p className="font-semibold text-gray-900 text-[11px]">{getProspectDisplayName(p)}</p>
                                                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                                                 {p.telefono && <span className="text-gray-400 text-[10px]">{p.telefono}</span>}
                                                                 <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-semibold">{etapaLabel(p.etapaEmbudo)}</span>
@@ -840,7 +852,7 @@ const CloserMonitoreoProspectors = () => {
                                                                 <tbody>
                                                                     {pData.prospectos.map((p) => (
                                                                         <tr key={p.id} className="border-b border-green-100 hover:bg-green-100/50">
-                                                                            <td className="py-1.5 pr-4 font-medium text-gray-800">{[p.nombres, p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || p.correo || 'Sin nombre'}</td>
+                                                                            <td className="py-1.5 pr-4 font-medium text-gray-800">{getProspectDisplayName(p)}</td>
                                                                             <td className="py-1.5 pr-4 text-gray-500">{p.telefono || '—'}</td>
                                                                             <td className="py-1.5 pr-4 text-gray-500">{p.correo || '—'}</td>
                                                                             <td className="py-1.5 pr-4 text-gray-500">{p.empresa || '—'}</td>
