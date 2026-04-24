@@ -3,6 +3,7 @@ const router = express.Router();
 const { db, isPostgres } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
+const googleSheets = require('../lib/googleSheetsService');
 
 function construirEtiquetaContacto(cliente) {
     const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
@@ -565,6 +566,21 @@ router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
         const cliente = toMongoFormat(row);
         if (cliente) cliente.closerAsignado = { nombre: req.usuario.nombre };
 
+        // Sincronizar con Google Sheets
+        try {
+            googleSheets.logNuevoProspecto({
+                fecha: now,
+                nombre: `${nombres} ${apellidoPaterno || ''} ${apellidoMaterno || ''}`,
+                empresa: empresa,
+                telefono: telefono,
+                correo: correo,
+                notas: notas,
+                vendedor: req.usuario.nombre
+            });
+        } catch (err) {
+            console.error('Error al sincronizar prospecto (closer) con Google Sheets:', err.message);
+        }
+
         res.status(201).json({ msg: 'Prospecto creado', cliente: cliente || row });
     } catch (error) {
         console.error('Error al crear prospecto:', error);
@@ -673,6 +689,21 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
         const actRow = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(ins.lastInsertRowid);
         const actividad = toMongoFormat(actRow);
         if (actividad) actividad.cliente = { nombres: cliente.nombres, apellidoPaterno: cliente.apellidoPaterno, empresa: cliente.empresa };
+
+        // Sincronizar con Google Sheets
+        try {
+            googleSheets.logActividad({
+                fecha: now,
+                tipo: tipo,
+                vendedor: req.usuario.nombre,
+                prospecto: `${cliente.nombres} ${cliente.apellidoPaterno || ''} (${cliente.empresa || 'S/E'})`,
+                descripcion: descripcion || `${tipo} registrada`,
+                resultado: resultadoFinal,
+                notas: notas
+            });
+        } catch (err) {
+            console.error('Error al sincronizar actividad (closer) con Google Sheets:', err.message);
+        }
 
         res.status(201).json({ msg: 'Actividad registrada', actividad: actividad || actRow });
     } catch (error) {

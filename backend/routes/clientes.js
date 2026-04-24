@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/database');
 const { auth, esSuperUser } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
+const googleSheets = require('../lib/googleSheetsService');
 
 router.get('/', auth, esSuperUser, async (req, res) => {
     try {
@@ -69,6 +70,22 @@ router.post('/', auth, esSuperUser, async (req, res) => {
         `).run(nombres, apellidoPaterno || '', apellidoMaterno || '', telefono, correo, empresa || '', estado || 'proceso', etapa, hist, vendedorId);
 
         const row = await db.prepare('SELECT * FROM clientes ORDER BY id DESC LIMIT 1').get();
+        
+        // Sincronizar con Google Sheets
+        try {
+            googleSheets.logNuevoProspecto({
+                fecha: now,
+                nombre: `${nombres} ${apellidoPaterno || ''} ${apellidoMaterno || ''}`,
+                empresa: empresa || 'S/E',
+                telefono: telefono,
+                correo: correo,
+                notas: 'Creado desde panel clientes',
+                vendedor: req.usuario.nombre
+            });
+        } catch (err) {
+            console.error('Error al sincronizar nuevo cliente con Google Sheets:', err.message);
+        }
+
         res.status(201).json({ mensaje: 'Cliente creado', cliente: toMongoFormat(row) || row });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });

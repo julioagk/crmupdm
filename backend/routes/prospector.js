@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
+const googleSheets = require('../lib/googleSheetsService');
 
 const esProspector = (req, res, next) => {
     const rol = String(req.usuario.rol).toLowerCase();
@@ -298,6 +299,21 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
         const cliente = toMongoFormat(row);
         if (cliente) cliente.prospectorAsignado = { nombre: req.usuario.nombre };
 
+        // Sincronizar con Google Sheets
+        try {
+            googleSheets.logNuevoProspecto({
+                fecha: now,
+                nombre: `${nombres} ${apellidoPaterno || ''} ${apellidoMaterno || ''}`,
+                empresa: empresa,
+                telefono: telefono,
+                correo: correo,
+                notas: notas,
+                vendedor: req.usuario.nombre
+            });
+        } catch (err) {
+            console.error('Error al sincronizar prospecto con Google Sheets:', err.message);
+        }
+
         // 🚀 Web Sockets: Emitir evento de actualización
         if (req.app.get('io')) {
             req.app.get('io').emit('prospectos_actualizados', {
@@ -401,6 +417,21 @@ router.post('/registrar-actividad', [auth, esProspector], async (req, res) => {
         const actRow = await db.prepare('SELECT * FROM actividades WHERE id = ?').get(ins.lastInsertRowid);
         const actividad = toMongoFormat(actRow);
         if (actividad) actividad.cliente = { nombres: cliente.nombres, apellidoPaterno: cliente.apellidoPaterno, empresa: cliente.empresa };
+
+        // Sincronizar con Google Sheets
+        try {
+            googleSheets.logActividad({
+                fecha: now,
+                tipo: tipo,
+                vendedor: req.usuario.nombre,
+                prospecto: `${cliente.nombres} ${cliente.apellidoPaterno || ''} (${cliente.empresa || 'S/E'})`,
+                descripcion: descripcion || `${tipo} registrada`,
+                resultado: resultadoFinal,
+                notas: notas
+            });
+        } catch (err) {
+            console.error('Error al sincronizar actividad con Google Sheets:', err.message);
+        }
 
         res.status(201).json({ msg: 'Actividad registrada', actividad: actividad || actRow });
     } catch (error) {
@@ -771,6 +802,21 @@ router.post('/agendar-reunion', [auth, esProspector], async (req, res) => {
 
         const clienteActualizado = await db.prepare('SELECT * FROM clientes WHERE id = ?').get(cid);
         const actividadRow = await db.prepare('SELECT * FROM actividades WHERE cliente = ? ORDER BY id DESC LIMIT 1').get(cid);
+
+        // Sincronizar con Google Sheets
+        try {
+            googleSheets.logActividad({
+                fecha: now,
+                tipo: 'cita',
+                vendedor: req.usuario.nombre,
+                prospecto: `${cliente.nombres} ${cliente.apellidoPaterno || ''} (${cliente.empresa || 'S/E'})`,
+                descripcion: `Cita agendada para el ${fechaDisplayMX}`,
+                resultado: 'pendiente',
+                notas: notasActividad
+            });
+        } catch (err) {
+            console.error('Error al sincronizar cita con Google Sheets:', err.message);
+        }
 
         res.json({
             msg: 'Reunión agendada exitosamente',

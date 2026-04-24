@@ -53,3 +53,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Google Cloud Keys
+crm-updm-*.json
+
+# Migration scripts
+backend/sync_existing_data.js

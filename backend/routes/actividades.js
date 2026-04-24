@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/database');
 const { auth, esSuperUser } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
+const googleSheets = require('../lib/googleSheetsService');
 
 function construirEtiquetaContacto(cliente) {
     const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
@@ -185,6 +186,23 @@ router.post('/', auth, esSuperUser, async (req, res) => {
             .run(tipo, parseInt(req.usuario.id), parseInt(cliente), descripcion || '', resultado || 'pendiente', notas || '');
         await db.prepare('UPDATE clientes SET ultimaInteraccion = ? WHERE id = ?').run(now, parseInt(cliente));
         const row = await db.prepare('SELECT * FROM actividades ORDER BY id DESC LIMIT 1').get();
+        
+        // Sincronizar con Google Sheets
+        try {
+            const vendedorRow = await db.prepare('SELECT nombre FROM usuarios WHERE id = ?').get(parseInt(req.usuario.id));
+            googleSheets.logActividad({
+                fecha: now,
+                tipo: tipo,
+                vendedor: vendedorRow?.nombre || 'Usuario ' + req.usuario.id,
+                prospecto: `${c.nombres} ${c.apellidoPaterno || ''} (${c.empresa || 'S/E'})`,
+                descripcion: descripcion,
+                resultado: resultado,
+                notas: notas
+            });
+        } catch (err) {
+            console.error('Error al sincronizar con Google Sheets:', err.message);
+        }
+
         res.status(201).json({ mensaje: 'Actividad registrada', actividad: toMongoFormat(row) || row });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });

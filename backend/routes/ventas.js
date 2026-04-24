@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
+const googleSheets = require('../lib/googleSheetsService');
 
 router.get('/', auth, async (req, res) => {
     try {
@@ -21,6 +22,22 @@ router.post('/', auth, async (req, res) => {
         await db.prepare('INSERT INTO ventas (cliente, vendedor, monto, estado, notas) VALUES (?, ?, ?, ?, ?)')
             .run(parseInt(cliente), vendedorId, parseFloat(monto), estado || 'pendiente', notas || '');
         const row = await db.prepare('SELECT * FROM ventas ORDER BY id DESC LIMIT 1').get();
+        
+        // Sincronizar con Google Sheets
+        try {
+            const clienteRow = await db.prepare('SELECT nombres, apellidoPaterno, empresa FROM clientes WHERE id = ?').get(parseInt(cliente));
+            googleSheets.logVenta({
+                fecha: new Date().toISOString(),
+                cliente: `${clienteRow?.nombres} ${clienteRow?.apellidoPaterno || ''} (${clienteRow?.empresa || 'S/E'})`,
+                vendedor: req.usuario.nombre,
+                monto: monto,
+                estado: estado,
+                notas: notas
+            });
+        } catch (err) {
+            console.error('Error al sincronizar venta con Google Sheets:', err.message);
+        }
+
         res.status(201).json({ mensaje: 'Venta registrada', venta: toMongoFormat(row) || row });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error del servidor' });
