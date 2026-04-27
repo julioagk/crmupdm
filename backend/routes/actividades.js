@@ -4,6 +4,7 @@ const { db } = require('../config/database');
 const { auth, esSuperUser } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
 const googleSheets = require('../lib/googleSheetsService');
+const crmSync = require('../lib/crmSync');
 
 function construirEtiquetaContacto(cliente) {
     const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
@@ -199,6 +200,9 @@ router.post('/', auth, esSuperUser, async (req, res) => {
                 resultado: resultado,
                 notas: notas
             });
+
+            // Disparar actualización de la hoja crm sin bloquear la respuesta
+            crmSync.updateCRMFromDB().catch(e => console.error('Error crmSync (actividad):', e.message || e));
         } catch (err) {
             console.error('Error al sincronizar con Google Sheets:', err.message);
         }

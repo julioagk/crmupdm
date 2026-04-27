@@ -11,7 +11,8 @@
     "vercel-build": "vite build",
     "sync-sheets": "node backend/sync_existing_data.js",
     "update-kpis": "node backend/update_kpis.js",
-    "setup-dashboard": "node backend/setup_dashboard.js"
+    "setup-dashboard": "node backend/setup_dashboard.js",
+    "update-crm": "node backend/update_crm.js"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.4",

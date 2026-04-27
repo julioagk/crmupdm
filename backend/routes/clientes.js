@@ -4,6 +4,7 @@ const { db } = require('../config/database');
 const { auth, esSuperUser } = require('../middleware/auth');
 const { toMongoFormat } = require('../lib/helpers');
 const googleSheets = require('../lib/googleSheetsService');
+const crmSync = require('../lib/crmSync');
 
 router.get('/', auth, esSuperUser, async (req, res) => {
     try {
@@ -82,6 +83,9 @@ router.post('/', auth, esSuperUser, async (req, res) => {
                 notas: 'Creado desde panel clientes',
                 vendedor: req.usuario.nombre
             });
+
+            // Actualizar hoja crm en segundo plano (no bloquear respuesta)
+            crmSync.updateCRMFromDB().catch(e => console.error('Error crmSync (nuevo cliente):', e.message || e));
         } catch (err) {
             console.error('Error al sincronizar nuevo cliente con Google Sheets:', err.message);
         }

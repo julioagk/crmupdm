@@ -199,38 +199,60 @@ class GoogleSheetsService {
     /**
      * Configura un Dashboard en tiempo real usando fórmulas.
      */
-    async setupRealtimeDashboard(usuarios) {
+    /**
+     * Configura un Dashboard con datos reales.
+     */
+    async setupRealtimeDashboard(dashboardData) {
         if (!this.auth) return;
         const range = 'Dashboard!A1';
-        const headers = [['Usuario', 'Total Prospectos', 'Prospectos Hoy', 'Contactos Hoy (Llamadas/MSGs)', 'Reuniones Hoy', '% Conv Total']];
+        const headers = [[
+            'Usuario', 
+            'Stock Activo', 
+            'Pros. Totales', 
+            'Pros. Hoy', 
+            'Llamadas Hoy', 
+            'Msgs Hoy', 
+            'Actividad Hoy', 
+            'Actividad Total',
+            'Citas Hoy',
+            'Citas Totales',
+            'Ventas Ganadas',
+            'Ventas Perdidas',
+            'Monto Ganado',
+            'Ticket Promedio',
+            '% Eficiencia (Cita)',
+            '% Cierre (Venta)'
+        ]];
         
-        const rows = usuarios.map((u, i) => {
-            const rowIdx = i + 2; // +1 por header, +1 por 1-based index
-            return [
-                u.nombre,
-                // Total Prospectos
-                `=COUNTIF(Prospectos!G:G, A${rowIdx})`,
-                // Prospectos Hoy (Asumiendo fecha en Columna A)
-                `=COUNTIFS(Prospectos!G:G, A${rowIdx}, Prospectos!A:A, ">="&TODAY())`,
-                // Contactos Hoy (Llamadas y Mensajes)
-                `=SUM(COUNTIFS(Actividades!C:C, A${rowIdx}, Actividades!A:A, ">="&TODAY(), Actividades!B:B, {"llamada", "whatsapp", "mensaje", "correo"}))`,
-                // Reuniones Hoy
-                `=COUNTIFS(Actividades!C:C, A${rowIdx}, Actividades!A:A, ">="&TODAY(), Actividades!B:B, "cita")`,
-                // % Conversión Total (Citas totales / Prospectos totales)
-                `=IFERROR(COUNTIFS(Actividades!C:C, A${rowIdx}, Actividades!B:B, "cita") / COUNTIF(Prospectos!G:G, A${rowIdx}), 0)`
-            ];
-        });
+        const rows = dashboardData.map(d => [
+            d.nombre,
+            d.stock,
+            d.totalPros,
+            d.nuevosHoy,
+            d.llamadasHoy,
+            d.msgsHoy,
+            d.actividadHoy,
+            d.actividadTotal,
+            d.citasHoy,
+            d.citasTotales,
+            d.ventasGanadas,
+            d.ventasPerdidas,
+            `$${Number(d.montoTotal).toLocaleString('es-MX')}`,
+            `$${Number(d.ticketPromedio).toLocaleString('es-MX')}`,
+            `${d.pctCita}%`,
+            `${d.pctCierre}%`
+        ]);
 
         try {
             const sheets = google.sheets({ version: 'v4', auth: this.auth });
             
-            // Verificar si la hoja existe
+            // Asegurar que la hoja existe
             try {
                 await sheets.spreadsheets.batchUpdate({
                     spreadsheetId: this.spreadsheetId,
                     resource: { requests: [{ addSheet: { properties: { title: 'Dashboard' } } }] }
                 });
-            } catch (e) { /* Ya existe */ }
+            } catch (e) { /* Ignorar si ya existe */ }
 
             await sheets.spreadsheets.values.update({
                 spreadsheetId: this.spreadsheetId,
@@ -240,9 +262,96 @@ class GoogleSheetsService {
                     values: [...headers, ...rows],
                 },
             });
-            console.log('🚀 Dashboard en tiempo real configurado');
+            console.log('🚀 Dashboard actualizado con Stock Real');
         } catch (error) {
             console.error('❌ Error al configurar Dashboard:', error.message);
+        }
+    }
+
+    /**
+     * Escribe una sola hoja CRM con solo Camila y Brenda, stock actual y métricas diarias/mensuales.
+     */
+    async updateCRMDataSheet(crmData) {
+        if (!this.auth) return;
+        if (!this.spreadsheetId) {
+            console.warn('⚠️ GoogleSheetsService: No se ha definido GOOGLE_SHEET_ID en el .env');
+            return;
+        }
+
+        const range = 'crm!A1';
+        const headers = [
+            ['Reporte CRM'],
+            ['Actualizado', crmData.generatedAt || new Date().toLocaleString('es-MX')],
+            [],
+            ['Resumen por usuario'],
+            ['Usuario', 'Stock Actual', 'Prospectos Hoy', 'Prospectos Mes', 'Contactos Hoy', 'Contactos Mes', 'Reuniones Hoy', 'Reuniones Mes'],
+        ];
+
+        const userRows = (crmData.usuarios || []).map(u => [
+            u.nombre,
+            u.stockActual,
+            u.prospectosHoy,
+            u.prospectosMes,
+            u.contactosHoy,
+            u.contactosMes,
+            u.reunionesHoy,
+            u.reunionesMes,
+        ]);
+
+        const prospectRows = (crmData.prospectos || []).map(p => [
+            p.usuario,
+            p.asignadoComo,
+            p.nombre,
+            p.empresa,
+            p.telefono,
+            p.correo,
+            p.etapa,
+            p.estado,
+            p.fechaRegistro,
+            p.ultimaEtapa,
+            p.notas,
+        ]);
+
+        const values = [
+            ...headers,
+            ...userRows,
+            [],
+            ['Prospectos actuales'],
+            ['Usuario', 'Asignado como', 'Nombre', 'Empresa', 'Telefono', 'Correo', 'Etapa', 'Estado', 'Fecha Registro', 'Ultima Etapa', 'Notas'],
+            ...prospectRows,
+        ];
+
+        try {
+            const sheets = google.sheets({ version: 'v4', auth: this.auth });
+
+            try {
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId: this.spreadsheetId,
+                    resource: {
+                        requests: [{ addSheet: { properties: { title: 'crm' } } }],
+                    },
+                });
+            } catch (error) {
+                if (!String(error.message || '').includes('already exists')) {
+                    console.warn('⚠️ GoogleSheetsService: No se pudo crear la hoja crm:', error.message);
+                }
+            }
+
+            await sheets.spreadsheets.values.clear({
+                spreadsheetId: this.spreadsheetId,
+                range: 'crm!A:Z',
+            });
+
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: this.spreadsheetId,
+                range,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values },
+            });
+
+            console.log('🚀 Hoja "crm" actualizada con datos filtrados de Camila y Brenda');
+        } catch (error) {
+            console.error('❌ Error al configurar hoja crm:', error.message);
         }
     }
 }

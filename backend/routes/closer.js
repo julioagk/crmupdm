@@ -4,6 +4,7 @@ const { db, isPostgres } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
 const googleSheets = require('../lib/googleSheetsService');
+const crmSync = require('../lib/crmSync');
 
 function construirEtiquetaContacto(cliente) {
     const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
@@ -577,6 +578,9 @@ router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
                 notas: notas,
                 vendedor: req.usuario.nombre
             });
+
+            // Actualizar hoja crm en segundo plano
+            crmSync.updateCRMFromDB().catch(e => console.error('Error crmSync (closer nuevo prospecto):', e.message || e));
         } catch (err) {
             console.error('Error al sincronizar prospecto (closer) con Google Sheets:', err.message);
         }
