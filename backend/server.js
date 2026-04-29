@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { updateKPIsSheet } = require('./lib/kpiSync');
 
 // Inicializar base de datos
 require('./config/database');
@@ -104,6 +105,22 @@ const HOST = '0.0.0.0'; // Railway requiere escuchar en 0.0.0.0
 const server = app.listen(PORT, HOST, () => {
     console.log(`🚀 Servidor corriendo en ${HOST}:${PORT}`);
     console.log(`📡 Modo: ${process.env.NODE_ENV || 'development'}`);
+
+    // ── Sincronización inicial de KPIs con Google Sheets ──────────────────
+    setTimeout(() => {
+        updateKPIsSheet()
+            .then(() => console.log('📊 KPIs sincronizados al iniciar el servidor'))
+            .catch(e => console.error('⚠️  Error en sync inicial de KPIs:', e.message));
+    }, 5000); // Esperar 5 s a que la BD esté lista
+
+    // ── Job periódico: actualizar KPIs cada 5 minutos ─────────────────────
+    const KPI_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+    setInterval(() => {
+        updateKPIsSheet()
+            .then(() => console.log(`📊 KPIs actualizados — ${new Date().toLocaleString('es-MX')}`))
+            .catch(e => console.error('⚠️  Error en sync periódico de KPIs:', e.message));
+    }, KPI_SYNC_INTERVAL_MS);
+    console.log(`⏱️  KPIs sincronizarán con Google Sheets cada ${KPI_SYNC_INTERVAL_MS / 60000} minutos`);
 });
 
 // ✅ INICIALIZAR SOCKET.IO

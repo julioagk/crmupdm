@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
 const { auth } = require('../middleware/auth');
+const { updateKPIsSheet } = require('../lib/kpiSync');
+const crmSync = require('../lib/crmSync');
 
 router.get('/', auth, async (req, res) => {
     try {
@@ -19,4 +21,34 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
+/**
+ * POST /api/metricas/sync-kpis
+ * Fuerza la sincronización inmediata de KPIs hacia Google Sheets.
+ * Solo usuarios autenticados (admin / gerentes).
+ */
+router.post('/sync-kpis', auth, async (req, res) => {
+    try {
+        await updateKPIsSheet();
+        res.json({ ok: true, mensaje: 'Hoja KPIs actualizada correctamente', timestamp: new Date().toISOString() });
+    } catch (error) {
+        console.error('❌ /sync-kpis error:', error.message);
+        res.status(500).json({ ok: false, mensaje: 'Error al sincronizar KPIs', error: error.message });
+    }
+});
+
+/**
+ * POST /api/metricas/sync-crm
+ * Fuerza la sincronización inmediata de la hoja CRM (Camila & Brenda) hacia Google Sheets.
+ */
+router.post('/sync-crm', auth, async (req, res) => {
+    try {
+        await crmSync.updateCRMFromDB();
+        res.json({ ok: true, mensaje: 'Hoja CRM actualizada correctamente', timestamp: new Date().toISOString() });
+    } catch (error) {
+        console.error('❌ /sync-crm error:', error.message);
+        res.status(500).json({ ok: false, mensaje: 'Error al sincronizar CRM', error: error.message });
+    }
+});
+
 module.exports = router;
+

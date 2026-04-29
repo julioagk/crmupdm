@@ -4,6 +4,7 @@ const { db } = require('../config/database');
 const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
 const googleSheets = require('../lib/googleSheetsService');
+const { updateKPIsSheet } = require('../lib/kpiSync');
 
 const esProspector = (req, res, next) => {
     const rol = String(req.usuario.rol).toLowerCase();
@@ -314,6 +315,9 @@ router.post('/crear-prospecto', [auth, esProspector], async (req, res) => {
             console.error('Error al sincronizar prospecto con Google Sheets:', err.message);
         }
 
+        // Actualizar KPIs en tiempo real (sin bloquear la respuesta)
+        updateKPIsSheet().catch(e => console.error('⚠️ kpiSync (prospector crear):', e.message));
+
         // 🚀 Web Sockets: Emitir evento de actualización
         if (req.app.get('io')) {
             req.app.get('io').emit('prospectos_actualizados', {
@@ -432,6 +436,9 @@ router.post('/registrar-actividad', [auth, esProspector], async (req, res) => {
         } catch (err) {
             console.error('Error al sincronizar actividad con Google Sheets:', err.message);
         }
+
+        // Actualizar KPIs en tiempo real (sin bloquear la respuesta)
+        updateKPIsSheet().catch(e => console.error('⚠️ kpiSync (prospector actividad):', e.message));
 
         res.status(201).json({ msg: 'Actividad registrada', actividad: actividad || actRow });
     } catch (error) {

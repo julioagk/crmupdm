@@ -5,6 +5,7 @@ const { auth } = require('../middleware/auth');
 const { toMongoFormat, toMongoFormatMany } = require('../lib/helpers');
 const googleSheets = require('../lib/googleSheetsService');
 const crmSync = require('../lib/crmSync');
+const { updateKPIsSheet } = require('../lib/kpiSync');
 
 function construirEtiquetaContacto(cliente) {
     const nombre = [cliente?.nombres, cliente?.apellidoPaterno, cliente?.apellidoMaterno]
@@ -585,6 +586,9 @@ router.post('/crear-prospecto', [auth, esCloser], async (req, res) => {
             console.error('Error al sincronizar prospecto (closer) con Google Sheets:', err.message);
         }
 
+        // Actualizar KPIs en tiempo real (sin bloquear la respuesta)
+        updateKPIsSheet().catch(e => console.error('⚠️ kpiSync (closer crear):', e.message));
+
         res.status(201).json({ msg: 'Prospecto creado', cliente: cliente || row });
     } catch (error) {
         console.error('Error al crear prospecto:', error);
@@ -708,6 +712,9 @@ router.post('/registrar-actividad', [auth, esCloser], async (req, res) => {
         } catch (err) {
             console.error('Error al sincronizar actividad (closer) con Google Sheets:', err.message);
         }
+
+        // Actualizar KPIs en tiempo real (sin bloquear la respuesta)
+        updateKPIsSheet().catch(e => console.error('⚠️ kpiSync (closer actividad):', e.message));
 
         res.status(201).json({ msg: 'Actividad registrada', actividad: actividad || actRow });
     } catch (error) {
