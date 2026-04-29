@@ -34,7 +34,28 @@ backend/database.db*
 backend/uploads/*
 !backend/uploads/.gitkeep
 
-# Variables de entorno
+# Variables de entorno (nunca subir estos archivos)
 .env
 .env.local
 .env.production
+.env.*.local
+
+# IDE
+.vscode/settings.json
+.vs/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Google Cloud Keys
+crm-updm-*.json
+
+# Migration scripts
+backend/sync_existing_data.js

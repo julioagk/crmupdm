@@ -1,0 +1,8 @@
+[build]
+buildCommand = "if [ -d backend ]; then cd backend; fi; npm install --omit=dev"
+
+[deploy]
+startCommand = "if [ -f backend/server.js ]; then node backend/server.js; else node server.js; fi"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
