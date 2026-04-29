@@ -8,17 +8,34 @@ const fs = require('fs');
 class GoogleSheetsService {
     constructor() {
         this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
-        // El archivo JSON de la cuenta de servicio está en la raíz del proyecto
-        this.keyFilePath = path.join(__dirname, '../../crm-updm-37bbc16dc608.json');
-        
-        if (!fs.existsSync(this.keyFilePath)) {
-            console.error('❌ GoogleSheetsService: No se encontró el archivo de credenciales en:', this.keyFilePath);
-            this.auth = null;
-        } else {
-            this.auth = new google.auth.GoogleAuth({
-                keyFile: this.keyFilePath,
-                scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-            });
+        this.auth = null;
+
+        // 1. Intentar con la variable de entorno (Railway / producción)
+        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+            try {
+                const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+                this.auth = new google.auth.GoogleAuth({
+                    credentials,
+                    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+                });
+                console.log('✅ GoogleSheetsService: Autenticado con variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON');
+            } catch (e) {
+                console.error('❌ GoogleSheetsService: Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON:', e.message);
+            }
+        }
+
+        // 2. Fallback: archivo local (desarrollo)
+        if (!this.auth) {
+            const keyFilePath = path.join(__dirname, '../../crm-updm-37bbc16dc608.json');
+            if (fs.existsSync(keyFilePath)) {
+                this.auth = new google.auth.GoogleAuth({
+                    keyFile: keyFilePath,
+                    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+                });
+                console.log('✅ GoogleSheetsService: Autenticado con archivo de credenciales local');
+            } else {
+                console.error('❌ GoogleSheetsService: Sin credenciales. Define GOOGLE_SERVICE_ACCOUNT_JSON en Railway o coloca el archivo JSON localmente.');
+            }
         }
     }
 
