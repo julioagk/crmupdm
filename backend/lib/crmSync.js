@@ -16,6 +16,17 @@ const normalize = (value) => String(value || '').trim().toLowerCase();
 
 const fullName = (row) => [row.nombres, row.apellidoPaterno, row.apellidoMaterno].filter(Boolean).join(' ').trim();
 
+// Helper para obtener el Lunes de la semana de una fecha
+function getWeekString(dateString) {
+    if (!dateString) return null;
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return null;
+    // Set to Monday of this week
+    const day = d.getDay() || 7; 
+    d.setHours(-24 * (day - 1));
+    return d.toISOString().slice(0, 10);
+}
+
 async function loadTargetUsers() {
     const usuarios = await db.prepare('SELECT id, nombre, usuario, rol FROM usuarios WHERE activo = 1').all();
     return usuarios.filter(user => {
@@ -40,6 +51,7 @@ async function buildCRMData() {
 
     const usuarios = [];
     const prospectos = [];
+    const historicoSemanal = [];
 
     for (const user of targetUsers) {
         const clientes = await db.prepare(`
@@ -77,6 +89,43 @@ async function buildCRMData() {
             reunionesMes,
         });
 
+        // ==========================
+        // CALCULO DE HISTORICO SEMANAL
+        // ==========================
+        const weeklyStats = {}; // key: 'YYYY-MM-DD' (Lunes), value: { prospectos:0, contactos:0, reuniones:0 }
+        
+        for (const c of clientes) {
+            const w = getWeekString(c.fechaRegistro);
+            if (!w) continue;
+            if (!weeklyStats[w]) weeklyStats[w] = { prospectos: 0, contactos: 0, reuniones: 0 };
+            weeklyStats[w].prospectos++;
+        }
+
+        for (const a of actividades) {
+            const w = getWeekString(a.fecha);
+            if (!w) continue;
+            if (!weeklyStats[w]) weeklyStats[w] = { prospectos: 0, contactos: 0, reuniones: 0 };
+            
+            const tipo = String(a.tipo).toLowerCase();
+            if (CONTACT_TYPES.has(tipo)) {
+                weeklyStats[w].contactos++;
+            } else if (tipo === 'cita') {
+                weeklyStats[w].reuniones++;
+            }
+        }
+
+        // Convertir objeto a array
+        for (const [semanaStr, stats] of Object.entries(weeklyStats)) {
+            historicoSemanal.push({
+                usuario: user.nombre,
+                semanaStr: semanaStr, // Usado para ordenar
+                semana: `Lunes ${semanaStr}`,
+                prospectos: stats.prospectos,
+                contactos: stats.contactos,
+                reuniones: stats.reuniones
+            });
+        }
+
         for (const cliente of clientes) {
             prospectos.push({
                 usuario: user.nombre,
@@ -94,10 +143,18 @@ async function buildCRMData() {
         }
     }
 
+    // Ordenar historicoSemanal por semana (descendente) y luego usuario
+    historicoSemanal.sort((a, b) => {
+        if (a.semanaStr > b.semanaStr) return -1;
+        if (a.semanaStr < b.semanaStr) return 1;
+        return a.usuario.localeCompare(b.usuario);
+    });
+
     return {
         generatedAt: new Date().toLocaleString('es-MX'),
         usuarios,
         prospectos,
+        historicoSemanal
     };
 }
 

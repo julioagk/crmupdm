@@ -367,6 +367,55 @@ class GoogleSheetsService {
             });
 
             console.log('🚀 Hoja "crm" actualizada con datos filtrados de Camila y Brenda');
+            
+            // ==========================================
+            // NUEVA HOJA: HISTORIAL SEMANAL
+            // ==========================================
+            try {
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId: this.spreadsheetId,
+                    resource: {
+                        requests: [{ addSheet: { properties: { title: 'crm_semanal' } } }],
+                    },
+                });
+            } catch (error) {
+                if (!String(error.message || '').includes('already exists')) {
+                    console.warn('⚠️ GoogleSheetsService: No se pudo crear la hoja crm_semanal:', error.message);
+                }
+            }
+
+            const weeklyRange = 'crm_semanal!A1';
+            const weeklyHeaders = [
+                ['Historial CRM por Semana'],
+                ['Actualizado', crmData.generatedAt || new Date().toLocaleString('es-MX')],
+                [],
+                ['Usuario', 'Semana Iniciando (Lunes)', 'Prospectos Nuevos', 'Contactos', 'Reuniones']
+            ];
+
+            const weeklyRows = (crmData.historicoSemanal || []).map(w => [
+                w.usuario,
+                w.semana,
+                w.prospectos,
+                w.contactos,
+                w.reuniones
+            ]);
+
+            const weeklyValues = [...weeklyHeaders, ...weeklyRows];
+
+            await sheets.spreadsheets.values.clear({
+                spreadsheetId: this.spreadsheetId,
+                range: 'crm_semanal!A:Z',
+            });
+
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: this.spreadsheetId,
+                range: weeklyRange,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: weeklyValues },
+            });
+
+            console.log('🚀 Hoja "crm_semanal" actualizada con historial semanal');
+
         } catch (error) {
             console.error('❌ Error al configurar hoja crm:', error.message);
         }
