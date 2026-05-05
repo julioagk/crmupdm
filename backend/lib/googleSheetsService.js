@@ -801,8 +801,15 @@ class GoogleSheetsService {
                         {
                             updateDimensionProperties: {
                                 range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
-                console.log(`📋 REGISTRO_DIARIO: nueva entrada para ${nombre} - ${todayFmt}`);
-            }
+                                properties: { pixelSize: 30 },
+                                fields: 'pixelSize'
+                            }
+                        }
+                    ]
+                }
+            });
+
+            console.log(`📋 REGISTRO_DIARIO: nueva entrada para ${nombre} - ${todayFmt}`);
         }
     }
 }
