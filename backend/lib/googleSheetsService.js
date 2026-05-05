@@ -337,7 +337,7 @@ class GoogleSheetsService {
     }
 
     _formatWeekHeader(semanaStr) {
-        const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         // Parse 'YYYY-MM-DD' sin depender de timezone
         const [y, m, d] = semanaStr.split('-').map(Number);
         const monday = new Date(y, m - 1, d);
@@ -403,7 +403,7 @@ class GoogleSheetsService {
         }
 
         const camila = currentData.find(r => r.usuario.toLowerCase().includes('camila'));
-        const brenda  = currentData.find(r => r.usuario.toLowerCase().includes('brenda'));
+        const brenda = currentData.find(r => r.usuario.toLowerCase().includes('brenda'));
         const { weekNum, label } = this._formatWeekHeader(currentWeekStr);
 
         // Filas del bloque
@@ -411,7 +411,7 @@ class GoogleSheetsService {
             [label, '', '', ''],
             ['VENDEDORA', 'PROSPECTOS', 'CONTACTOS', 'REUNIONES'],
             [camila ? camila.usuario.toUpperCase() : 'CAMILA', camila ? camila.prospectos : 0, camila ? camila.contactos : 0, camila ? camila.reuniones : 0],
-            [brenda  ? brenda.usuario.toUpperCase()  : 'BRENDA', brenda  ? brenda.prospectos  : 0, brenda  ? brenda.contactos  : 0, brenda  ? brenda.reuniones  : 0],
+            [brenda ? brenda.usuario.toUpperCase() : 'BRENDA', brenda ? brenda.prospectos : 0, brenda ? brenda.contactos : 0, brenda ? brenda.reuniones : 0],
             ['', '', '', ''],
         ];
 
@@ -612,11 +612,11 @@ class GoogleSheetsService {
             'PROSPECTOS NUEVOS HOY', 'PROSPECTOS TOTALES',
             'CONTACTOS HOY', 'REUNIONES HOY',
         ];
-        const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
         const now = new Date();
         const todayFmt = `${now.getDate()} ${MESES[now.getMonth()]} ${now.getFullYear()}`;
-        const horaFmt  = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' });
+        const horaFmt = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' });
 
         // Solo Camila y Brenda
         const targets = usuarios.filter(u =>
@@ -684,7 +684,7 @@ class GoogleSheetsService {
                         },
                         // Anchos de columna
                         { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 130 }, fields: 'pixelSize' } },
-                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 90 },  fields: 'pixelSize' } },
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 90 }, fields: 'pixelSize' } },
                         { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 180 }, fields: 'pixelSize' } },
                         { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 7 }, properties: { pixelSize: 145 }, fields: 'pixelSize' } },
                         // Altura fila encabezado
@@ -694,20 +694,17 @@ class GoogleSheetsService {
             });
         }
 
-        // 3. Para cada usuario: lectura fresca + upsert independiente
+        // 3. Para cada usuario: solo insertar si hay cambios respecto al ultimo registro
         for (const u of targets) {
             const nombre = u.nombre.toUpperCase();
-            const newRow = [
-                todayFmt,
-                horaFmt,
-                nombre,
-                u.prospectosHoy  || 0,
-                u.stockActual    || 0,
-                u.contactosHoy   || 0,
-                u.reunionesHoy   || 0,
-            ];
+            const primerNombre = nombre.split(' ')[0]; // "CAMILA" o "BRENDA"
 
-            // Leer filas frescas en cada iteracion para no usar indices desfasados
+            const prospNuevos = u.prospectosHoy  || 0;
+            const prospTotales = u.stockActual   || 0;
+            const contactos    = u.contactosHoy  || 0;
+            const reuniones    = u.reunionesHoy  || 0;
+
+            // Leer filas frescas para encontrar el ultimo registro de este usuario
             let currentRows = [];
             try {
                 const resp = await sheets.spreadsheets.values.get({
@@ -717,87 +714,93 @@ class GoogleSheetsService {
                 currentRows = resp.data.values || [];
             } catch (_) { /* hoja vacia */ }
 
-            // Buscar fila del dia de hoy para este usuario (case-insensitive)
-            const todayLower = todayFmt.toLowerCase();
-            const primerNombre = nombre.split(' ')[0]; // ej: "CAMILA" o "BRENDA"
-            const existingIdx = currentRows.findIndex(r =>
-                String(r[0] || '').trim().toLowerCase() === todayLower &&
+            // Buscar el registro mas reciente de este usuario (el primero que aparezca, ya que son mas recientes arriba)
+            const lastRow = currentRows.find(r =>
                 String(r[2] || '').toUpperCase().includes(primerNombre)
             );
 
-            if (existingIdx >= 0) {
-                // Ya existe: solo actualizar los valores (hora + numeros)
-                const sheetRow = existingIdx + 2; // +2 porque A2 = indice 0
-                await sheets.spreadsheets.values.update({
-                    spreadsheetId,
-                    range: `${SHEET}!A${sheetRow}:G${sheetRow}`,
-                    valueInputOption: 'USER_ENTERED',
-                    resource: { values: [newRow] },
-                });
-            } else {
-                // Dia nuevo para este usuario: insertar fila debajo del encabezado
-                await sheets.spreadsheets.batchUpdate({
-                    spreadsheetId,
-                    resource: {
-                        requests: [{
-                            insertDimension: {
+            // Comparar valores actuales con el ultimo registro
+            const lastProspNuevos  = Number(lastRow?.[3] ?? -1);
+            const lastProspTotales = Number(lastRow?.[4] ?? -1);
+            const lastContactos    = Number(lastRow?.[5] ?? -1);
+            const lastReuniones    = Number(lastRow?.[6] ?? -1);
+
+            const haycambios =
+                prospNuevos  !== lastProspNuevos  ||
+                prospTotales !== lastProspTotales ||
+                contactos    !== lastContactos    ||
+                reuniones    !== lastReuniones;
+
+            if (!haycambios) {
+                // Sin cambios: no crear fila duplicada
+                continue;
+            }
+
+            // Hay cambios: insertar nueva fila al inicio (debajo del encabezado)
+            const newRow = [
+                todayFmt,
+                horaFmt,
+                nombre,
+                prospNuevos,
+                prospTotales,
+                contactos,
+                reuniones,
+            ];
+
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: {
+                    requests: [{
+                        insertDimension: {
+                            range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+                            inheritFromBefore: false,
+                        },
+                    }],
+                },
+            });
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${SHEET}!A2:G2`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [newRow] },
+            });
+
+            // Estilo de la nueva fila de datos (alternado suave)
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: {
+                    requests: [
+                        {
+                            repeatCell: {
+                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 },
+                                cell: {
+                                    userEnteredFormat: {
+                                        backgroundColor: { red: 0.90, green: 0.93, blue: 0.96 },
+                                        textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 10 },
+                                        horizontalAlignment: 'LEFT',
+                                        verticalAlignment: 'MIDDLE',
+                                    },
+                                },
+                                fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                            },
+                        },
+                        {
+                            repeatCell: {
+                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 7 },
+                                cell: {
+                                    userEnteredFormat: {
+                                        backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
+                                        textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 12 },
+                                        horizontalAlignment: 'CENTER',
+                                        verticalAlignment: 'MIDDLE',
+                                    },
+                                },
+                                fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                            },
+                        },
+                        {
+                            updateDimensionProperties: {
                                 range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
-                                inheritFromBefore: false,
-                            },
-                        }],
-                    },
-                });
-                await sheets.spreadsheets.values.update({
-                    spreadsheetId,
-                    range: `${SHEET}!A2:G2`,
-                    valueInputOption: 'USER_ENTERED',
-                    resource: { values: [newRow] },
-                });
-
-                // Estilo de la nueva fila
-                await sheets.spreadsheets.batchUpdate({
-                    spreadsheetId,
-                    resource: {
-                        requests: [
-                            {
-                                repeatCell: {
-                                    range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 },
-                                    cell: {
-                                        userEnteredFormat: {
-                                            backgroundColor: { red: 0.90, green: 0.93, blue: 0.96 },
-                                            textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 10 },
-                                            horizontalAlignment: 'LEFT',
-                                            verticalAlignment: 'MIDDLE',
-                                        },
-                                    },
-                                    fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
-                                },
-                            },
-                            {
-                                repeatCell: {
-                                    range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 7 },
-                                    cell: {
-                                        userEnteredFormat: {
-                                            backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
-                                            textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 12 },
-                                            horizontalAlignment: 'CENTER',
-                                            verticalAlignment: 'MIDDLE',
-                                        },
-                                    },
-                                    fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
-                                },
-                            },
-                            {
-                                updateDimensionProperties: {
-                                    range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
-                                    properties: { pixelSize: 30 },
-                                    fields: 'pixelSize',
-                                },
-                            },
-                        ],
-                    },
-                });
-
                 console.log(`📋 REGISTRO_DIARIO: nueva entrada para ${nombre} - ${todayFmt}`);
             }
         }
