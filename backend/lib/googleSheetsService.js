@@ -316,6 +316,12 @@ class GoogleSheetsService {
             // =====================================================
             await this._updateHistoricoSemanal(sheets, this.spreadsheetId, crmData.historicoSemanal || []);
 
+            // =====================================================
+            // REGISTRO_DIARIO: un registro por usuario por dia,
+            // mas recientes arriba, actualiza el de hoy si existe.
+            // =====================================================
+            await this._updateRegistroDiario(sheets, this.spreadsheetId, crmData.usuarios || []);
+
         } catch (error) {
             console.error('❌ Error al configurar hoja crm:', error.message);
         }
@@ -584,6 +590,214 @@ class GoogleSheetsService {
             });
 
             console.log(`🚀 HISTORICO_SEMANAL: nuevo bloque SEMANA ${weekNum} insertado al inicio`);
+        }
+    }
+
+    // ─── REGISTRO_DIARIO: log diario por usuario ──────────────────────────────
+    //
+    // Estructura de la hoja:
+    //   Fila 1: Encabezados (congelada, estilo azul oscuro)
+    //   Filas 2+: Un registro por usuario por dia, mas recientes arriba.
+    //
+    //   Columnas: Fecha | Hora | Vendedora | Pros. Nuevos | Pros. Totales | Contactos | Reuniones
+    //
+    // Comportamiento:
+    //   - Si ya existe un registro para HOY + usuario: lo actualiza.
+    //   - Si no: inserta una fila nueva debajo del encabezado (arriba de todo).
+
+    async _updateRegistroDiario(sheets, spreadsheetId, usuarios) {
+        const SHEET = 'REGISTRO_DIARIO';
+        const COL_HEADERS = [
+            'FECHA', 'HORA', 'VENDEDORA',
+            'PROSPECTOS NUEVOS HOY', 'PROSPECTOS TOTALES',
+            'CONTACTOS HOY', 'REUNIONES HOY',
+        ];
+        const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+        const now = new Date();
+        const todayFmt = `${now.getDate()} ${MESES[now.getMonth()]} ${now.getFullYear()}`;
+        const horaFmt  = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' });
+
+        // Solo Camila y Brenda
+        const targets = usuarios.filter(u =>
+            u.nombre.toLowerCase().includes('camila') ||
+            u.nombre.toLowerCase().includes('brenda')
+        );
+        if (targets.length === 0) return;
+
+        // 1. Asegurar que la hoja existe y obtener su sheetId
+        let sheetId;
+        let isNewSheet = false;
+        try {
+            const meta = await sheets.spreadsheets.get({ spreadsheetId });
+            const found = meta.data.sheets.find(s => s.properties.title === SHEET);
+            if (found) {
+                sheetId = found.properties.sheetId;
+            } else {
+                const res = await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    resource: { requests: [{ addSheet: { properties: { title: SHEET } } }] },
+                });
+                sheetId = res.data.replies[0].addSheet.properties.sheetId;
+                isNewSheet = true;
+                console.log(`✅ Hoja "${SHEET}" creada`);
+            }
+        } catch (e) {
+            console.warn(`⚠️ Error verificando hoja "${SHEET}":`, e.message);
+            return;
+        }
+
+        // 2. Si es hoja nueva, escribir encabezados y aplicar formato
+        if (isNewSheet) {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${SHEET}!A1:G1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [COL_HEADERS] },
+            });
+
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: {
+                    requests: [
+                        // Estilo encabezado: azul oscuro, texto blanco, negrita
+                        {
+                            repeatCell: {
+                                range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 7 },
+                                cell: {
+                                    userEnteredFormat: {
+                                        backgroundColor: { red: 0.13, green: 0.19, blue: 0.25 },
+                                        textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true, fontFamily: 'Roboto' },
+                                        horizontalAlignment: 'CENTER',
+                                        verticalAlignment: 'MIDDLE',
+                                    },
+                                },
+                                fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                            },
+                        },
+                        // Congelar fila 1
+                        {
+                            updateSheetProperties: {
+                                properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+                                fields: 'gridProperties.frozenRowCount',
+                            },
+                        },
+                        // Anchos de columna
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 130 }, fields: 'pixelSize' } },
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 90 },  fields: 'pixelSize' } },
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 180 }, fields: 'pixelSize' } },
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 7 }, properties: { pixelSize: 145 }, fields: 'pixelSize' } },
+                        // Altura fila encabezado
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 32 }, fields: 'pixelSize' } },
+                    ],
+                },
+            });
+        }
+
+        // 3. Leer filas existentes (sin encabezado)
+        let existingRows = [];
+        try {
+            const resp = await sheets.spreadsheets.values.get({
+                spreadsheetId,
+                range: `${SHEET}!A2:G500`,
+            });
+            existingRows = resp.data.values || [];
+        } catch (_) { /* hoja vacia */ }
+
+        // 4. Para cada usuario: upsert (actualizar si existe hoy, insertar si no)
+        for (const u of targets) {
+            const nombre = u.nombre.toUpperCase();
+            const newRow = [
+                todayFmt,
+                horaFmt,
+                nombre,
+                u.prospectosHoy  || 0,
+                u.stockActual    || 0,
+                u.contactosHoy   || 0,
+                u.reunionesHoy   || 0,
+            ];
+
+            // Buscar fila existente: mismo dia Y mismo nombre
+            const existingIdx = existingRows.findIndex(r =>
+                String(r[0] || '').trim() === todayFmt &&
+                String(r[2] || '').toUpperCase().includes(nombre.split(' ')[0])
+            );
+
+            if (existingIdx >= 0) {
+                // Actualizar fila existente (existingIdx + 2 porque empezamos en A2)
+                const sheetRow = existingIdx + 2;
+                await sheets.spreadsheets.values.update({
+                    spreadsheetId,
+                    range: `${SHEET}!A${sheetRow}:G${sheetRow}`,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [newRow] },
+                });
+            } else {
+                // Insertar fila nueva debajo del encabezado (fila 2)
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    resource: {
+                        requests: [{
+                            insertDimension: {
+                                range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+                                inheritFromBefore: false,
+                            },
+                        }],
+                    },
+                });
+                await sheets.spreadsheets.values.update({
+                    spreadsheetId,
+                    range: `${SHEET}!A2:G2`,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [newRow] },
+                });
+
+                // Estilo de la nueva fila de datos (alternado suave)
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    resource: {
+                        requests: [
+                            {
+                                repeatCell: {
+                                    range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 },
+                                    cell: {
+                                        userEnteredFormat: {
+                                            backgroundColor: { red: 0.90, green: 0.93, blue: 0.96 },
+                                            textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 10 },
+                                            horizontalAlignment: 'LEFT',
+                                            verticalAlignment: 'MIDDLE',
+                                        },
+                                    },
+                                    fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                                },
+                            },
+                            {
+                                repeatCell: {
+                                    range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 7 },
+                                    cell: {
+                                        userEnteredFormat: {
+                                            backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
+                                            textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 12 },
+                                            horizontalAlignment: 'CENTER',
+                                            verticalAlignment: 'MIDDLE',
+                                        },
+                                    },
+                                    fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                                },
+                            },
+                            {
+                                updateDimensionProperties: {
+                                    range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+                                    properties: { pixelSize: 30 },
+                                    fields: 'pixelSize',
+                                },
+                            },
+                        ],
+                    },
+                });
+
+                console.log(`📋 REGISTRO_DIARIO: nueva entrada para ${nombre} - ${todayFmt}`);
+            }
         }
     }
 }
