@@ -284,7 +284,7 @@ async function updateKPIsSheet() {
             {
                 repeatCell: {
                     range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 9 },
-                    cell: { userEnteredFormat: { backgroundColor: { red: 0.17, green: 0.24, blue: 0.31 }, textFormat: { color: { red: 1, green: 1, blue: 1 }, fontSize: 14, bold: true } } },
+                    cell: { userEnteredFormat: { backgroundColor: { red: 0.17, green: 0.24, blue: 0.31 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, fontSize: 14, bold: true } } },
                     fields: 'userEnteredFormat(backgroundColor,textFormat)'
                 }
             },
@@ -295,18 +295,18 @@ async function updateKPIsSheet() {
                 { mergeCells: { range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: 5, endColumnIndex: 7 }, mergeType: 'MERGE_ALL' } },
                 { mergeCells: { range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: 7, endColumnIndex: 9 }, mergeType: 'MERGE_ALL' } }
             ]),
-            // Color para encabezados de categorías
+            // Color para encabezados de categorías (verde)
             {
                 repeatCell: {
                     range: { sheetId, startRowIndex: 4, endRowIndex: 6, startColumnIndex: 0, endColumnIndex: 9 },
-                    cell: { userEnteredFormat: { backgroundColor: { red: 0.18, green: 0.8, blue: 0.44 }, textFormat: { color: { red: 1, green: 1, blue: 1 }, bold: true } } },
+                    cell: { userEnteredFormat: { backgroundColor: { red: 0.18, green: 0.8, blue: 0.44 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true } } },
                     fields: 'userEnteredFormat(backgroundColor,textFormat)'
                 }
             },
             {
                 repeatCell: {
                     range: { sheetId, startRowIndex: 14, endRowIndex: 16, startColumnIndex: 0, endColumnIndex: 9 },
-                    cell: { userEnteredFormat: { backgroundColor: { red: 0.18, green: 0.8, blue: 0.44 }, textFormat: { color: { red: 1, green: 1, blue: 1 }, bold: true } } },
+                    cell: { userEnteredFormat: { backgroundColor: { red: 0.18, green: 0.8, blue: 0.44 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true } } },
                     fields: 'userEnteredFormat(backgroundColor,textFormat)'
                 }
             },
@@ -314,14 +314,14 @@ async function updateKPIsSheet() {
             {
                 repeatCell: {
                     range: { sheetId, startRowIndex: 7, endRowIndex: 9, startColumnIndex: 0, endColumnIndex: 1 },
-                    cell: { userEnteredFormat: { backgroundColor: { red: 0.9, green: 0.1, blue: 0.1 }, textFormat: { color: { red: 1, green: 1, blue: 1 }, bold: true } } },
+                    cell: { userEnteredFormat: { backgroundColor: { red: 0.9, green: 0.1, blue: 0.1 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true } } },
                     fields: 'userEnteredFormat(backgroundColor,textFormat)'
                 }
             },
             {
                 repeatCell: {
                     range: { sheetId, startRowIndex: 17, endRowIndex: 19, startColumnIndex: 0, endColumnIndex: 1 },
-                    cell: { userEnteredFormat: { backgroundColor: { red: 0.9, green: 0.1, blue: 0.1 }, textFormat: { color: { red: 1, green: 1, blue: 1 }, bold: true } } },
+                    cell: { userEnteredFormat: { backgroundColor: { red: 0.9, green: 0.1, blue: 0.1 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true } } },
                     fields: 'userEnteredFormat(backgroundColor,textFormat)'
                 }
             }
