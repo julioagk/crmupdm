@@ -187,8 +187,9 @@ async function updateKPIsSheet() {
     const SHEET_NAME = 'KPI_PROSPECCION';
 
     // ── Asegurar que la hoja existe ──────────────────────────────────────────
+    let spreadsheet;
     try {
-        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+        spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
         const sheetExists = spreadsheet.data.sheets.some(s => s.properties.title === SHEET_NAME);
         
         if (!sheetExists) {
@@ -199,9 +200,12 @@ async function updateKPIsSheet() {
                 }
             });
             console.log(`✅ kpiSync: Hoja "${SHEET_NAME}" creada`);
+            // Actualizar info de la spreadsheet para obtener el nuevo sheetId
+            spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
         }
     } catch (e) {
         console.warn(`⚠️ kpiSync: Error al verificar/crear hoja "${SHEET_NAME}":`, e.message);
+        throw e;
     }
 
     // ── Leer valores actuales para preservar las Metas ────────────────────────
