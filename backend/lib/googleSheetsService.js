@@ -75,7 +75,6 @@ class GoogleSheetsService {
      */
     async logActividad(data) {
         const { fecha, tipo, vendedor, prospecto, descripcion, resultado, notas } = data;
-        // Formato: [Fecha, Tipo, Vendedor, Prospecto, Descripción, Resultado, Notas]
         await this.appendRow('Actividades!A1', [
             fecha || new Date().toLocaleString('es-MX'),
             tipo,
@@ -92,7 +91,6 @@ class GoogleSheetsService {
      */
     async logNuevoProspecto(data) {
         const { fecha, nombre, empresa, telefono, correo, notas, vendedor } = data;
-        // Formato: [Fecha, Nombre, Empresa, Teléfono, Correo, Notas, Vendedor]
         await this.appendRow('Prospectos!A1', [
             fecha || new Date().toLocaleString('es-MX'),
             nombre,
@@ -118,12 +116,10 @@ class GoogleSheetsService {
         try {
             const sheets = google.sheets({ version: 'v4', auth: this.auth });
             for (const [range, values] of Object.entries(headers)) {
-                // Verificar si la hoja tiene datos
                 const response = await sheets.spreadsheets.values.get({
                     spreadsheetId: this.spreadsheetId,
                     range: range,
                 });
-
                 if (!response.data.values || response.data.values.length === 0) {
                     await sheets.spreadsheets.values.update({
                         spreadsheetId: this.spreadsheetId,
@@ -144,7 +140,6 @@ class GoogleSheetsService {
      */
     async logVenta(data) {
         const { fecha, cliente, vendedor, monto, estado, notas } = data;
-        // Formato: [Fecha, Cliente, Vendedor, Monto, Estado, Notas]
         await this.appendRow('Ventas!A1', [
             fecha || new Date().toLocaleString('es-MX'),
             cliente,
@@ -176,8 +171,6 @@ class GoogleSheetsService {
 
         try {
             const sheets = google.sheets({ version: 'v4', auth: this.auth });
-            
-            // Limpiar y escribir
             await sheets.spreadsheets.values.update({
                 spreadsheetId: this.spreadsheetId,
                 range: range,
@@ -188,7 +181,6 @@ class GoogleSheetsService {
             });
             console.log('📈 Hoja de KPIs actualizada');
         } catch (error) {
-            // Si la hoja no existe, intentar crearla
             if (error.message.includes('not found') || error.message.includes('Unable to parse range')) {
                 try {
                     const sheets = google.sheets({ version: 'v4', auth: this.auth });
@@ -201,11 +193,7 @@ class GoogleSheetsService {
                     console.log('✅ Hoja "KPIs" creada exitosamente');
                     await this.updateKPIsSheet(kpiData);
                 } catch (e) {
-                    if (e.message.includes('already exists')) {
-                         // Si ya existe por alguna razón, reintentar una última vez
-                         console.log('La hoja ya existe, reintentando actualización...');
-                         // Evitar loop infinito
-                    } else {
+                    if (!e.message.includes('already exists')) {
                         console.error('❌ Error creando hoja KPIs:', e.message);
                     }
                 }
@@ -214,56 +202,29 @@ class GoogleSheetsService {
     }
 
     /**
-     * Configura un Dashboard en tiempo real usando fórmulas.
-     */
-    /**
      * Configura un Dashboard con datos reales.
      */
     async setupRealtimeDashboard(dashboardData) {
         if (!this.auth) return;
         const range = 'Dashboard!A1';
         const headers = [[
-            'Usuario', 
-            'Stock Activo', 
-            'Pros. Totales', 
-            'Pros. Hoy', 
-            'Llamadas Hoy', 
-            'Msgs Hoy', 
-            'Actividad Hoy', 
-            'Actividad Total',
-            'Citas Hoy',
-            'Citas Totales',
-            'Ventas Ganadas',
-            'Ventas Perdidas',
-            'Monto Ganado',
-            'Ticket Promedio',
-            '% Eficiencia (Cita)',
-            '% Cierre (Venta)'
+            'Usuario', 'Stock Activo', 'Pros. Totales', 'Pros. Hoy',
+            'Llamadas Hoy', 'Msgs Hoy', 'Actividad Hoy', 'Actividad Total',
+            'Citas Hoy', 'Citas Totales', 'Ventas Ganadas', 'Ventas Perdidas',
+            'Monto Ganado', 'Ticket Promedio', '% Eficiencia (Cita)', '% Cierre (Venta)'
         ]];
-        
+
         const rows = dashboardData.map(d => [
-            d.nombre,
-            d.stock,
-            d.totalPros,
-            d.nuevosHoy,
-            d.llamadasHoy,
-            d.msgsHoy,
-            d.actividadHoy,
-            d.actividadTotal,
-            d.citasHoy,
-            d.citasTotales,
-            d.ventasGanadas,
-            d.ventasPerdidas,
+            d.nombre, d.stock, d.totalPros, d.nuevosHoy, d.llamadasHoy, d.msgsHoy,
+            d.actividadHoy, d.actividadTotal, d.citasHoy, d.citasTotales,
+            d.ventasGanadas, d.ventasPerdidas,
             `$${Number(d.montoTotal).toLocaleString('es-MX')}`,
             `$${Number(d.ticketPromedio).toLocaleString('es-MX')}`,
-            `${d.pctCita}%`,
-            `${d.pctCierre}%`
+            `${d.pctCita}%`, `${d.pctCierre}%`
         ]);
 
         try {
             const sheets = google.sheets({ version: 'v4', auth: this.auth });
-            
-            // Asegurar que la hoja existe
             try {
                 await sheets.spreadsheets.batchUpdate({
                     spreadsheetId: this.spreadsheetId,
@@ -275,9 +236,7 @@ class GoogleSheetsService {
                 spreadsheetId: this.spreadsheetId,
                 range: range,
                 valueInputOption: 'USER_ENTERED',
-                resource: {
-                    values: [...headers, ...rows],
-                },
+                resource: { values: [...headers, ...rows] },
             });
             console.log('🚀 Dashboard actualizado con Stock Real');
         } catch (error) {
@@ -286,7 +245,7 @@ class GoogleSheetsService {
     }
 
     /**
-     * Escribe una sola hoja CRM con solo Camila y Brenda, stock actual y métricas diarias/mensuales.
+     * Escribe la hoja CRM con datos de Camila y Brenda, y actualiza HISTORICO_SEMANAL.
      */
     async updateCRMDataSheet(crmData) {
         if (!this.auth) return;
@@ -305,28 +264,13 @@ class GoogleSheetsService {
         ];
 
         const userRows = (crmData.usuarios || []).map(u => [
-            u.nombre,
-            u.stockActual,
-            u.prospectosHoy,
-            u.prospectosMes,
-            u.contactosHoy,
-            u.contactosMes,
-            u.reunionesHoy,
-            u.reunionesMes,
+            u.nombre, u.stockActual, u.prospectosHoy, u.prospectosMes,
+            u.contactosHoy, u.contactosMes, u.reunionesHoy, u.reunionesMes,
         ]);
 
         const prospectRows = (crmData.prospectos || []).map(p => [
-            p.usuario,
-            p.asignadoComo,
-            p.nombre,
-            p.empresa,
-            p.telefono,
-            p.correo,
-            p.etapa,
-            p.estado,
-            p.fechaRegistro,
-            p.ultimaEtapa,
-            p.notas,
+            p.usuario, p.asignadoComo, p.nombre, p.empresa, p.telefono,
+            p.correo, p.etapa, p.estado, p.fechaRegistro, p.ultimaEtapa, p.notas,
         ]);
 
         const values = [
@@ -344,9 +288,7 @@ class GoogleSheetsService {
             try {
                 await sheets.spreadsheets.batchUpdate({
                     spreadsheetId: this.spreadsheetId,
-                    resource: {
-                        requests: [{ addSheet: { properties: { title: 'crm' } } }],
-                    },
+                    resource: { requests: [{ addSheet: { properties: { title: 'crm' } } }] },
                 });
             } catch (error) {
                 if (!String(error.message || '').includes('already exists')) {
@@ -367,57 +309,278 @@ class GoogleSheetsService {
             });
 
             console.log('🚀 Hoja "crm" actualizada con datos filtrados de Camila y Brenda');
-            
-            // ==========================================
-            // NUEVA HOJA: HISTORIAL SEMANAL
-            // ==========================================
-            try {
-                await sheets.spreadsheets.batchUpdate({
-                    spreadsheetId: this.spreadsheetId,
-                    resource: {
-                        requests: [{ addSheet: { properties: { title: 'HISTORICO_SEMANAL' } } }],
-                    },
-                });
-            } catch (error) {
-                if (!String(error.message || '').includes('already exists')) {
-                    console.warn('⚠️ GoogleSheetsService: No se pudo crear la hoja HISTORICO_SEMANAL:', error.message);
-                }
-            }
 
-            const weeklyRange = 'HISTORICO_SEMANAL!A1';
-            const weeklyHeaders = [
-                ['REPORTES SEMANALES ACUMULADOS'],
-                ['Ultima actualizacion', crmData.generatedAt || new Date().toLocaleString('es-MX')],
-                [],
-                ['Usuario', 'Semana (Lunes)', 'Prospectos', 'Contactos', 'Reuniones']
-            ];
-
-            const weeklyRows = (crmData.historicoSemanal || []).map(w => [
-                w.usuario,
-                w.semana,
-                w.prospectos,
-                w.contactos,
-                w.reuniones
-            ]);
-
-            const weeklyValues = [...weeklyHeaders, ...weeklyRows];
-
-            await sheets.spreadsheets.values.clear({
-                spreadsheetId: this.spreadsheetId,
-                range: 'HISTORICO_SEMANAL!A:Z',
-            });
-
-            await sheets.spreadsheets.values.update({
-                spreadsheetId: this.spreadsheetId,
-                range: weeklyRange,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: weeklyValues },
-            });
-
-            console.log('🚀 Hoja "HISTORICO_SEMANAL" actualizada con éxito');
+            // =====================================================
+            // HISTORICO_SEMANAL: un bloque por semana, las semanas
+            // anteriores quedan congeladas con sus datos finales.
+            // =====================================================
+            await this._updateHistoricoSemanal(sheets, this.spreadsheetId, crmData.historicoSemanal || []);
 
         } catch (error) {
             console.error('❌ Error al configurar hoja crm:', error.message);
+        }
+    }
+
+    // ─── Helpers de semana ────────────────────────────────────────────────────
+
+    _getWeekNum(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    }
+
+    _formatWeekHeader(semanaStr) {
+        const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        // Parse 'YYYY-MM-DD' sin depender de timezone
+        const [y, m, d] = semanaStr.split('-').map(Number);
+        const monday = new Date(y, m - 1, d);
+        const sunday = new Date(y, m - 1, d + 6);
+        const weekNum = this._getWeekNum(monday);
+        const monFmt = `${monday.getDate()} ${MESES[monday.getMonth()]}`;
+        const sunFmt = `${sunday.getDate()} ${MESES[sunday.getMonth()]} ${sunday.getFullYear()}`;
+        return { weekNum, label: `SEMANA ${weekNum}   |   ${monFmt} al ${sunFmt}` };
+    }
+
+    // ─── Actualiza HISTORICO_SEMANAL con un bloque por semana ─────────────────
+    //
+    // Estructura de cada bloque (5 filas):
+    //   Fila 1: SEMANA N  |  DD Mes - DD Mes YYYY  (header azul oscuro, merged)
+    //   Fila 2: VENDEDORA | PROSPECTOS | CONTACTOS | REUNIONES  (encabezados verde)
+    //   Fila 3: CAMILA ... datos ...
+    //   Fila 4: BRENDA ... datos ...
+    //   Fila 5: (espacio)
+    //
+    // Comportamiento:
+    //   - Si la semana actual ya tiene bloque: solo actualiza filas 3-4.
+    //   - Si es semana nueva: inserta 5 filas al inicio y aplica formato.
+    //   - Semanas anteriores NUNCA se modifican.
+
+    async _updateHistoricoSemanal(sheets, spreadsheetId, historicoSemanal) {
+        const SHEET = 'HISTORICO_SEMANAL';
+        const BLOCK_SIZE = 5;
+
+        // 1. Asegurar que la hoja existe y obtener su sheetId
+        let sheetId;
+        try {
+            const meta = await sheets.spreadsheets.get({ spreadsheetId });
+            const found = meta.data.sheets.find(s => s.properties.title === SHEET);
+            if (found) {
+                sheetId = found.properties.sheetId;
+            } else {
+                const res = await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    resource: { requests: [{ addSheet: { properties: { title: SHEET } } }] },
+                });
+                sheetId = res.data.replies[0].addSheet.properties.sheetId;
+                console.log(`✅ Hoja "${SHEET}" creada`);
+            }
+        } catch (e) {
+            console.warn(`⚠️ Error verificando hoja "${SHEET}":`, e.message);
+            return;
+        }
+
+        // 2. Semana actual: calcular el lunes en hora local
+        const now = new Date();
+        const dayOfWeek = now.getDay() || 7;
+        const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1));
+        const yyyy = monday.getFullYear();
+        const mm = String(monday.getMonth() + 1).padStart(2, '0');
+        const dd = String(monday.getDate()).padStart(2, '0');
+        const currentWeekStr = `${yyyy}-${mm}-${dd}`;
+
+        // 3. Filtrar datos de la semana actual
+        const currentData = historicoSemanal.filter(r => r.semanaStr === currentWeekStr);
+        if (currentData.length === 0) {
+            console.log(`ℹ️ Sin datos para semana ${currentWeekStr}, HISTORICO_SEMANAL sin cambios`);
+            return;
+        }
+
+        const camila = currentData.find(r => r.usuario.toLowerCase().includes('camila'));
+        const brenda  = currentData.find(r => r.usuario.toLowerCase().includes('brenda'));
+        const { weekNum, label } = this._formatWeekHeader(currentWeekStr);
+
+        // Filas del bloque
+        const BLOCK = [
+            [label, '', '', ''],
+            ['VENDEDORA', 'PROSPECTOS', 'CONTACTOS', 'REUNIONES'],
+            [camila ? camila.usuario.toUpperCase() : 'CAMILA', camila ? camila.prospectos : 0, camila ? camila.contactos : 0, camila ? camila.reuniones : 0],
+            [brenda  ? brenda.usuario.toUpperCase()  : 'BRENDA', brenda  ? brenda.prospectos  : 0, brenda  ? brenda.contactos  : 0, brenda  ? brenda.reuniones  : 0],
+            ['', '', '', ''],
+        ];
+
+        // 4. Leer contenido actual del sheet
+        let existingValues = [];
+        try {
+            const resp = await sheets.spreadsheets.values.get({
+                spreadsheetId,
+                range: `${SHEET}!A1:D300`,
+            });
+            existingValues = resp.data.values || [];
+        } catch (_) { /* sheet vacio */ }
+
+        // 5. Buscar si ya existe el bloque de esta semana (por "SEMANA N" en col A)
+        let currentWeekRowIdx = -1;
+        const weekTag = `SEMANA ${weekNum}`;
+        for (let i = 0; i < existingValues.length; i++) {
+            const cell = String(existingValues[i] ? existingValues[i][0] || '' : '');
+            if (cell.startsWith(weekTag)) {
+                currentWeekRowIdx = i;
+                break;
+            }
+        }
+
+        if (currentWeekRowIdx >= 0) {
+            // ── Bloque ya existe: solo actualizar filas de datos (3 y 4 del bloque)
+            const dataRow1 = currentWeekRowIdx + 3; // 1-indexed
+            const dataRow2 = currentWeekRowIdx + 4;
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${SHEET}!A${dataRow1}:D${dataRow2}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [BLOCK[2], BLOCK[3]] },
+            });
+            console.log(`📊 HISTORICO_SEMANAL: Semana ${weekNum} actualizada (filas ${dataRow1}-${dataRow2})`);
+
+        } else {
+            // ── Semana nueva: insertar 5 filas al inicio del sheet
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: {
+                    requests: [{
+                        insertDimension: {
+                            range: { sheetId, dimension: 'ROWS', startIndex: 0, endIndex: BLOCK_SIZE },
+                            inheritFromBefore: false,
+                        },
+                    }],
+                },
+            });
+
+            // Escribir el bloque
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${SHEET}!A1:D${BLOCK_SIZE}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: BLOCK },
+            });
+
+            // Aplicar formato SOLO al nuevo bloque (filas índice 0-3)
+            const fmtRequests = [
+                // Merge fila 1 (header de semana) a lo ancho de las 4 columnas
+                {
+                    mergeCells: {
+                        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 4 },
+                        mergeType: 'MERGE_ALL',
+                    },
+                },
+                // Fila 1: azul oscuro, texto blanco, negrita, centrado
+                {
+                    repeatCell: {
+                        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 4 },
+                        cell: {
+                            userEnteredFormat: {
+                                backgroundColor: { red: 0.13, green: 0.19, blue: 0.25 },
+                                textFormat: {
+                                    foregroundColor: { red: 1, green: 1, blue: 1 },
+                                    bold: true,
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                },
+                                horizontalAlignment: 'CENTER',
+                                verticalAlignment: 'MIDDLE',
+                            },
+                        },
+                        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                    },
+                },
+                // Fila 2: verde, texto blanco negrita (encabezados de columna)
+                {
+                    repeatCell: {
+                        range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 4 },
+                        cell: {
+                            userEnteredFormat: {
+                                backgroundColor: { red: 0.18, green: 0.72, blue: 0.42 },
+                                textFormat: {
+                                    foregroundColor: { red: 1, green: 1, blue: 1 },
+                                    bold: true,
+                                    fontFamily: 'Roboto',
+                                },
+                                horizontalAlignment: 'CENTER',
+                                verticalAlignment: 'MIDDLE',
+                            },
+                        },
+                        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                    },
+                },
+                // Filas 3-4 col A (nombre vendedora): azul grisáceo, negrita, izquierda
+                {
+                    repeatCell: {
+                        range: { sheetId, startRowIndex: 2, endRowIndex: 4, startColumnIndex: 0, endColumnIndex: 1 },
+                        cell: {
+                            userEnteredFormat: {
+                                backgroundColor: { red: 0.84, green: 0.87, blue: 0.91 },
+                                textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 10 },
+                                horizontalAlignment: 'LEFT',
+                                verticalAlignment: 'MIDDLE',
+                            },
+                        },
+                        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                    },
+                },
+                // Filas 3-4 cols B-D (números): gris muy claro, negrita grande, centrado
+                {
+                    repeatCell: {
+                        range: { sheetId, startRowIndex: 2, endRowIndex: 4, startColumnIndex: 1, endColumnIndex: 4 },
+                        cell: {
+                            userEnteredFormat: {
+                                backgroundColor: { red: 0.95, green: 0.97, blue: 0.98 },
+                                textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 13 },
+                                horizontalAlignment: 'CENTER',
+                                verticalAlignment: 'MIDDLE',
+                            },
+                        },
+                        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                    },
+                },
+                // Bordes del bloque (filas 0-3)
+                {
+                    updateBorders: {
+                        range: { sheetId, startRowIndex: 0, endRowIndex: 4, startColumnIndex: 0, endColumnIndex: 4 },
+                        outerBorder: { style: 'SOLID_MEDIUM', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                        innerHorizontal: { style: 'SOLID', color: { red: 0.78, green: 0.78, blue: 0.78 } },
+                        innerVertical: { style: 'SOLID', color: { red: 0.78, green: 0.78, blue: 0.78 } },
+                    },
+                },
+                // Alturas de fila: header 40px, col-headers 26px, datos 34px
+                {
+                    updateDimensionProperties: {
+                        range: { sheetId, dimension: 'ROWS', startIndex: 0, endIndex: 1 },
+                        properties: { pixelSize: 40 },
+                        fields: 'pixelSize',
+                    },
+                },
+                {
+                    updateDimensionProperties: {
+                        range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+                        properties: { pixelSize: 26 },
+                        fields: 'pixelSize',
+                    },
+                },
+                {
+                    updateDimensionProperties: {
+                        range: { sheetId, dimension: 'ROWS', startIndex: 2, endIndex: 4 },
+                        properties: { pixelSize: 34 },
+                        fields: 'pixelSize',
+                    },
+                },
+            ];
+
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: { requests: fmtRequests },
+            });
+
+            console.log(`🚀 HISTORICO_SEMANAL: nuevo bloque SEMANA ${weekNum} insertado al inicio`);
         }
     }
 }
