@@ -46,7 +46,7 @@ async function buildCRMData() {
     const targetUsers = await loadTargetUsers();
 
     if (targetUsers.length === 0) {
-        return { generatedAt: new Date().toLocaleString('es-MX'), usuarios: [], prospectos: [] };
+        return { generatedAt: new Date().toLocaleString('es-MX'), usuarios: [], prospectos: [], historicoSemanal: [] };
     }
 
     const usuarios = [];
@@ -69,6 +69,12 @@ async function buildCRMData() {
             WHERE vendedor = ?
             ORDER BY fecha DESC, id DESC
         `).all(user.id);
+
+        const todosLosClientes = await db.prepare(`
+            SELECT fechaRegistro
+            FROM clientes
+            WHERE (prospectorAsignado = ? OR vendedorAsignado = ? OR closerAsignado = ?)
+        `).all(user.id, user.id, user.id);
 
         const stockActual = clientes.length;
         const prospectosHoy = clientes.filter(c => startsWithPrefix(c.fechaRegistro, todayPrefix)).length;
@@ -94,7 +100,7 @@ async function buildCRMData() {
         // ==========================
         const weeklyStats = {}; // key: 'YYYY-MM-DD' (Lunes), value: { prospectos:0, contactos:0, reuniones:0 }
         
-        for (const c of clientes) {
+        for (const c of todosLosClientes) {
             const w = getWeekString(c.fechaRegistro);
             if (!w) continue;
             if (!weeklyStats[w]) weeklyStats[w] = { prospectos: 0, contactos: 0, reuniones: 0 };

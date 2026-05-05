@@ -375,21 +375,21 @@ class GoogleSheetsService {
                 await sheets.spreadsheets.batchUpdate({
                     spreadsheetId: this.spreadsheetId,
                     resource: {
-                        requests: [{ addSheet: { properties: { title: 'crm_semanal' } } }],
+                        requests: [{ addSheet: { properties: { title: 'HISTORICO_SEMANAL' } } }],
                     },
                 });
             } catch (error) {
                 if (!String(error.message || '').includes('already exists')) {
-                    console.warn('⚠️ GoogleSheetsService: No se pudo crear la hoja crm_semanal:', error.message);
+                    console.warn('⚠️ GoogleSheetsService: No se pudo crear la hoja HISTORICO_SEMANAL:', error.message);
                 }
             }
 
-            const weeklyRange = 'crm_semanal!A1';
+            const weeklyRange = 'HISTORICO_SEMANAL!A1';
             const weeklyHeaders = [
-                ['Historial CRM por Semana'],
-                ['Actualizado', crmData.generatedAt || new Date().toLocaleString('es-MX')],
+                ['REPORTES SEMANALES ACUMULADOS'],
+                ['Ultima actualizacion', crmData.generatedAt || new Date().toLocaleString('es-MX')],
                 [],
-                ['Usuario', 'Semana Iniciando (Lunes)', 'Prospectos Nuevos', 'Contactos', 'Reuniones']
+                ['Usuario', 'Semana (Lunes)', 'Prospectos', 'Contactos', 'Reuniones']
             ];
 
             const weeklyRows = (crmData.historicoSemanal || []).map(w => [
@@ -404,7 +404,7 @@ class GoogleSheetsService {
 
             await sheets.spreadsheets.values.clear({
                 spreadsheetId: this.spreadsheetId,
-                range: 'crm_semanal!A:Z',
+                range: 'HISTORICO_SEMANAL!A:Z',
             });
 
             await sheets.spreadsheets.values.update({
@@ -414,7 +414,7 @@ class GoogleSheetsService {
                 resource: { values: weeklyValues },
             });
 
-            console.log('🚀 Hoja "crm_semanal" actualizada con historial semanal');
+            console.log('🚀 Hoja "HISTORICO_SEMANAL" actualizada con éxito');
 
         } catch (error) {
             console.error('❌ Error al configurar hoja crm:', error.message);
