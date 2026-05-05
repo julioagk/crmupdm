@@ -546,7 +546,10 @@ class GoogleSheetsService {
                 {
                     updateBorders: {
                         range: { sheetId, startRowIndex: 0, endRowIndex: 4, startColumnIndex: 0, endColumnIndex: 4 },
-                        outerBorder: { style: 'SOLID_MEDIUM', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                        top: { style: 'SOLID_MEDIUM', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                        bottom: { style: 'SOLID_MEDIUM', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                        left: { style: 'SOLID_MEDIUM', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                        right: { style: 'SOLID_MEDIUM', color: { red: 0.13, green: 0.19, blue: 0.25 } },
                         innerHorizontal: { style: 'SOLID', color: { red: 0.78, green: 0.78, blue: 0.78 } },
                         innerVertical: { style: 'SOLID', color: { red: 0.78, green: 0.78, blue: 0.78 } },
                     },
