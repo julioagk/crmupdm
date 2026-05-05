@@ -694,17 +694,7 @@ class GoogleSheetsService {
             });
         }
 
-        // 3. Leer filas existentes (sin encabezado)
-        let existingRows = [];
-        try {
-            const resp = await sheets.spreadsheets.values.get({
-                spreadsheetId,
-                range: `${SHEET}!A2:G500`,
-            });
-            existingRows = resp.data.values || [];
-        } catch (_) { /* hoja vacia */ }
-
-        // 4. Para cada usuario: upsert (actualizar si existe hoy, insertar si no)
+        // 3. Para cada usuario: lectura fresca + upsert independiente
         for (const u of targets) {
             const nombre = u.nombre.toUpperCase();
             const newRow = [
@@ -717,15 +707,27 @@ class GoogleSheetsService {
                 u.reunionesHoy   || 0,
             ];
 
-            // Buscar fila existente: mismo dia Y mismo nombre
-            const existingIdx = existingRows.findIndex(r =>
-                String(r[0] || '').trim() === todayFmt &&
-                String(r[2] || '').toUpperCase().includes(nombre.split(' ')[0])
+            // Leer filas frescas en cada iteracion para no usar indices desfasados
+            let currentRows = [];
+            try {
+                const resp = await sheets.spreadsheets.values.get({
+                    spreadsheetId,
+                    range: `${SHEET}!A2:G500`,
+                });
+                currentRows = resp.data.values || [];
+            } catch (_) { /* hoja vacia */ }
+
+            // Buscar fila del dia de hoy para este usuario (case-insensitive)
+            const todayLower = todayFmt.toLowerCase();
+            const primerNombre = nombre.split(' ')[0]; // ej: "CAMILA" o "BRENDA"
+            const existingIdx = currentRows.findIndex(r =>
+                String(r[0] || '').trim().toLowerCase() === todayLower &&
+                String(r[2] || '').toUpperCase().includes(primerNombre)
             );
 
             if (existingIdx >= 0) {
-                // Actualizar fila existente (existingIdx + 2 porque empezamos en A2)
-                const sheetRow = existingIdx + 2;
+                // Ya existe: solo actualizar los valores (hora + numeros)
+                const sheetRow = existingIdx + 2; // +2 porque A2 = indice 0
                 await sheets.spreadsheets.values.update({
                     spreadsheetId,
                     range: `${SHEET}!A${sheetRow}:G${sheetRow}`,
@@ -733,7 +735,7 @@ class GoogleSheetsService {
                     resource: { values: [newRow] },
                 });
             } else {
-                // Insertar fila nueva debajo del encabezado (fila 2)
+                // Dia nuevo para este usuario: insertar fila debajo del encabezado
                 await sheets.spreadsheets.batchUpdate({
                     spreadsheetId,
                     resource: {
@@ -752,7 +754,7 @@ class GoogleSheetsService {
                     resource: { values: [newRow] },
                 });
 
-                // Estilo de la nueva fila de datos (alternado suave)
+                // Estilo de la nueva fila
                 await sheets.spreadsheets.batchUpdate({
                     spreadsheetId,
                     resource: {
