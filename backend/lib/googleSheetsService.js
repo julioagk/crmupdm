@@ -609,7 +609,7 @@ class GoogleSheetsService {
         const SHEET = 'REGISTRO_DIARIO';
         const COL_HEADERS = [
             'FECHA', 'HORA', 'VENDEDORA',
-            'PROSPECTOS NUEVOS HOY', 'PROSPECTOS TOTALES',
+            'PROSPECTOS NUEVOS HOY',
             'CONTACTOS HOY', 'REUNIONES HOY',
         ];
         const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -651,7 +651,7 @@ class GoogleSheetsService {
         if (isNewSheet) {
             await sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: `${SHEET}!A1:G1`,
+                range: `${SHEET}!A1:F1`,
                 valueInputOption: 'USER_ENTERED',
                 resource: { values: [COL_HEADERS] },
             });
@@ -660,10 +660,9 @@ class GoogleSheetsService {
                 spreadsheetId,
                 resource: {
                     requests: [
-                        // Estilo encabezado: azul oscuro, texto blanco, negrita
                         {
                             repeatCell: {
-                                range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 7 },
+                                range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 6 },
                                 cell: {
                                     userEnteredFormat: {
                                         backgroundColor: { red: 0.13, green: 0.19, blue: 0.25 },
@@ -675,97 +674,102 @@ class GoogleSheetsService {
                                 fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
                             },
                         },
-                        // Congelar fila 1
                         {
                             updateSheetProperties: {
                                 properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
                                 fields: 'gridProperties.frozenRowCount',
                             },
                         },
-                        // Anchos de columna
                         { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 130 }, fields: 'pixelSize' } },
                         { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 90 }, fields: 'pixelSize' } },
                         { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 180 }, fields: 'pixelSize' } },
-                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 7 }, properties: { pixelSize: 145 }, fields: 'pixelSize' } },
-                        // Altura fila encabezado
+                        { updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 6 }, properties: { pixelSize: 145 }, fields: 'pixelSize' } },
                         { updateDimensionProperties: { range: { sheetId, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 32 }, fields: 'pixelSize' } },
                     ],
                 },
             });
         }
 
-        // 3. Para cada usuario: solo insertar si hay cambios respecto al ultimo registro
+        // 3. Para cada usuario: insertar evento si hay cambios
         for (const u of targets) {
             const nombre = u.nombre.toUpperCase();
-            const primerNombre = nombre.split(' ')[0]; // "CAMILA" o "BRENDA"
+            const primerNombre = nombre.split(' ')[0];
 
             const prospNuevos = u.prospectosHoy  || 0;
-            const prospTotales = u.stockActual   || 0;
             const contactos    = u.contactosHoy  || 0;
             const reuniones    = u.reunionesHoy  || 0;
 
-            // Leer filas frescas para encontrar el ultimo registro de este usuario
             let currentRows = [];
             try {
                 const resp = await sheets.spreadsheets.values.get({
                     spreadsheetId,
-                    range: `${SHEET}!A2:G500`,
+                    range: `${SHEET}!A2:F500`,
                 });
                 currentRows = resp.data.values || [];
-            } catch (_) { /* hoja vacia */ }
+            } catch (_) { }
 
-            // Buscar el registro mas reciente de este usuario (el primero que aparezca, ya que son mas recientes arriba)
-            const lastRow = currentRows.find(r =>
-                String(r[2] || '').toUpperCase().includes(primerNombre)
-            );
+            let sumProspNuevos = 0;
+            let sumContactos = 0;
+            let sumReuniones = 0;
 
-            // Comparar valores actuales con el ultimo registro
-            const lastProspNuevos  = Number(lastRow?.[3] ?? -1);
-            const lastProspTotales = Number(lastRow?.[4] ?? -1);
-            const lastContactos    = Number(lastRow?.[5] ?? -1);
-            const lastReuniones    = Number(lastRow?.[6] ?? -1);
+            for (const r of currentRows) {
+                if (String(r[2] || '').toUpperCase().includes(primerNombre)) {
+                    if (r[0] === todayFmt) {
+                        sumProspNuevos += Number(String(r[3] || '0').replace('+', '')) || 0;
+                        sumContactos   += Number(String(r[4] || '0').replace('+', '')) || 0;
+                        sumReuniones   += Number(String(r[5] || '0').replace('+', '')) || 0;
+                    }
+                }
+            }
+
+            const deltaProspNuevos = prospNuevos - sumProspNuevos;
+            const deltaContactos   = contactos - sumContactos;
+            const deltaReuniones   = reuniones - sumReuniones;
 
             const haycambios =
-                prospNuevos  !== lastProspNuevos  ||
-                prospTotales !== lastProspTotales ||
-                contactos    !== lastContactos    ||
-                reuniones    !== lastReuniones;
+                deltaProspNuevos !== 0 ||
+                deltaContactos !== 0 ||
+                deltaReuniones !== 0;
 
             if (!haycambios) {
-                // Sin cambios: no crear fila duplicada
                 continue;
             }
 
-            // Hay cambios: insertar nueva fila al inicio (debajo del encabezado)
+            const formatDelta = (val) => {
+                if (val > 0) return `+${val}`;
+                if (val < 0) return `${val}`;
+                return '0';
+            };
+
             const newRow = [
                 todayFmt,
                 horaFmt,
                 nombre,
-                prospNuevos,
-                prospTotales,
-                contactos,
-                reuniones,
+                formatDelta(deltaProspNuevos),
+                formatDelta(deltaContactos),
+                formatDelta(deltaReuniones),
             ];
 
+            // Usamos insertRange para solo empujar las columnas A-F y no afectar a las otras
             await sheets.spreadsheets.batchUpdate({
                 spreadsheetId,
                 resource: {
                     requests: [{
-                        insertDimension: {
-                            range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
-                            inheritFromBefore: false,
-                        },
+                        insertRange: {
+                            range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 6 },
+                            shiftDimension: 'ROWS'
+                        }
                     }],
                 },
             });
+
             await sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: `${SHEET}!A2:G2`,
+                range: `${SHEET}!A2:F2`,
                 valueInputOption: 'USER_ENTERED',
                 resource: { values: [newRow] },
             });
 
-            // Estilo de la nueva fila de datos (alternado suave)
             await sheets.spreadsheets.batchUpdate({
                 spreadsheetId,
                 resource: {
@@ -786,7 +790,7 @@ class GoogleSheetsService {
                         },
                         {
                             repeatCell: {
-                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 7 },
+                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 6 },
                                 cell: {
                                     userEnteredFormat: {
                                         backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
@@ -811,6 +815,72 @@ class GoogleSheetsService {
 
             console.log(`📋 REGISTRO_DIARIO: nueva entrada para ${nombre} - ${todayFmt}`);
         }
+
+        // 4. Actualizar el contador aparte de PROSPECTOS TOTALES en las columnas H e I
+        const stockData = [
+            ['PROSPECTOS TOTALES', ''],
+            ...targets.map(u => [u.nombre.toUpperCase(), u.stockActual || 0])
+        ];
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${SHEET}!H1:I${1 + targets.length}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: stockData },
+        });
+
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            resource: {
+                requests: [
+                    {
+                        mergeCells: {
+                            range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 7, endColumnIndex: 9 },
+                            mergeType: 'MERGE_ALL',
+                        }
+                    },
+                    {
+                        repeatCell: {
+                            range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 7, endColumnIndex: 9 },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.13, green: 0.19, blue: 0.25 },
+                                    textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true, fontFamily: 'Roboto' },
+                                    horizontalAlignment: 'CENTER',
+                                    verticalAlignment: 'MIDDLE',
+                                },
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                        }
+                    },
+                    {
+                        repeatCell: {
+                            range: { sheetId, startRowIndex: 1, endRowIndex: 1 + targets.length, startColumnIndex: 7, endColumnIndex: 9 },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
+                                    textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 11 },
+                                    horizontalAlignment: 'CENTER',
+                                    verticalAlignment: 'MIDDLE',
+                                },
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                        }
+                    },
+                    {
+                        updateBorders: {
+                            range: { sheetId, startRowIndex: 0, endRowIndex: 1 + targets.length, startColumnIndex: 7, endColumnIndex: 9 },
+                            top: { style: 'SOLID', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                            bottom: { style: 'SOLID', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                            left: { style: 'SOLID', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                            right: { style: 'SOLID', color: { red: 0.13, green: 0.19, blue: 0.25 } },
+                            innerHorizontal: { style: 'SOLID', color: { red: 0.78, green: 0.78, blue: 0.78 } },
+                            innerVertical: { style: 'SOLID', color: { red: 0.78, green: 0.78, blue: 0.78 } },
+                        }
+                    }
+                ]
+            }
+        });
     }
 }
 
