@@ -703,7 +703,7 @@ class GoogleSheetsService {
             try {
                 const resp = await sheets.spreadsheets.values.get({
                     spreadsheetId,
-                    range: `${SHEET}!A2:F500`,
+                    range: `${SHEET}!A2:F1000`,
                 });
                 currentRows = resp.data.values || [];
             } catch (_) { }
@@ -712,108 +712,119 @@ class GoogleSheetsService {
             let sumContactos = 0;
             let sumReuniones = 0;
 
+            const todayLower = todayFmt.toLowerCase().trim();
+
             for (const r of currentRows) {
                 if (String(r[2] || '').toUpperCase().includes(primerNombre)) {
-                    if (r[0] === todayFmt) {
-                        sumProspNuevos += Number(String(r[3] || '0').replace('+', '')) || 0;
-                        sumContactos   += Number(String(r[4] || '0').replace('+', '')) || 0;
-                        sumReuniones   += Number(String(r[5] || '0').replace('+', '')) || 0;
+                    const cellDate = String(r[0] || '').toLowerCase().trim();
+                    if (cellDate === todayLower) {
+                        sumProspNuevos += Number(String(r[3] || '0').replace('+', '').replace("'", "")) || 0;
+                        sumContactos   += Number(String(r[4] || '0').replace('+', '').replace("'", "")) || 0;
+                        sumReuniones   += Number(String(r[5] || '0').replace('+', '').replace("'", "")) || 0;
                     }
                 }
             }
 
-            const deltaProspNuevos = prospNuevos - sumProspNuevos;
-            const deltaContactos   = contactos - sumContactos;
-            const deltaReuniones   = reuniones - sumReuniones;
+            let deltaProspNuevos = prospNuevos - sumProspNuevos;
+            let deltaContactos   = contactos - sumContactos;
+            let deltaReuniones   = reuniones - sumReuniones;
 
-            const haycambios =
-                deltaProspNuevos !== 0 ||
-                deltaContactos !== 0 ||
-                deltaReuniones !== 0;
+            // Solo deltas positivos (el CRM a veces fluctúa, pero solo nos interesan los incrementos)
+            if (deltaProspNuevos < 0) deltaProspNuevos = 0;
+            if (deltaContactos < 0) deltaContactos = 0;
+            if (deltaReuniones < 0) deltaReuniones = 0;
 
-            if (!haycambios) {
-                continue;
-            }
+            const totalDelta = deltaProspNuevos + deltaContactos + deltaReuniones;
+            if (totalDelta === 0) continue;
 
             const formatDelta = (val) => {
-                if (val > 0) return `+${val}`;
-                if (val < 0) return `${val}`;
+                if (val > 0) return `'+${val}`; // Forzar texto con ' para que Sheets no quite el +
                 return '0';
             };
 
-            const newRow = [
-                todayFmt,
-                horaFmt,
-                nombre,
-                formatDelta(deltaProspNuevos),
-                formatDelta(deltaContactos),
-                formatDelta(deltaReuniones),
-            ];
+            // Desglosar en filas individuales de +1 si hay múltiples cambios
+            // Esto cumple con el requisito de "solo debe ser +1 cada que agreguen 1 nuevo"
+            const maxIter = Math.max(deltaProspNuevos, deltaContactos, deltaReuniones);
 
-            // Usamos insertRange para solo empujar las columnas A-F y no afectar a las otras
-            await sheets.spreadsheets.batchUpdate({
-                spreadsheetId,
-                resource: {
-                    requests: [{
-                        insertRange: {
-                            range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 6 },
-                            shiftDimension: 'ROWS'
-                        }
-                    }],
-                },
-            });
+            for (let i = 0; i < maxIter; i++) {
+                const dP = i < deltaProspNuevos ? 1 : 0;
+                const dC = i < deltaContactos ? 1 : 0;
+                const dR = i < deltaReuniones ? 1 : 0;
 
-            await sheets.spreadsheets.values.update({
-                spreadsheetId,
-                range: `${SHEET}!A2:F2`,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [newRow] },
-            });
+                const newRow = [
+                    todayFmt,
+                    horaFmt,
+                    nombre,
+                    formatDelta(dP),
+                    formatDelta(dC),
+                    formatDelta(dR),
+                ];
 
-            await sheets.spreadsheets.batchUpdate({
-                spreadsheetId,
-                resource: {
-                    requests: [
-                        {
-                            repeatCell: {
-                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 },
-                                cell: {
-                                    userEnteredFormat: {
-                                        backgroundColor: { red: 0.90, green: 0.93, blue: 0.96 },
-                                        textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 10 },
-                                        horizontalAlignment: 'LEFT',
-                                        verticalAlignment: 'MIDDLE',
-                                    },
-                                },
-                                fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
-                            },
-                        },
-                        {
-                            repeatCell: {
-                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 6 },
-                                cell: {
-                                    userEnteredFormat: {
-                                        backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
-                                        textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 12 },
-                                        horizontalAlignment: 'CENTER',
-                                        verticalAlignment: 'MIDDLE',
-                                    },
-                                },
-                                fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
-                            },
-                        },
-                        {
-                            updateDimensionProperties: {
-                                range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
-                                properties: { pixelSize: 30 },
-                                fields: 'pixelSize'
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    resource: {
+                        requests: [{
+                            insertRange: {
+                                range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 6 },
+                                shiftDimension: 'ROWS'
                             }
-                        }
-                    ]
-                }
-            });
+                        }],
+                    },
+                });
 
-            console.log(`📋 REGISTRO_DIARIO: nueva entrada para ${nombre} - ${todayFmt}`);
+                await sheets.spreadsheets.values.update({
+                    spreadsheetId,
+                    range: `${SHEET}!A2:F2`,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [newRow] },
+                });
+
+                // Estilo para la fila recién insertada
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    resource: {
+                        requests: [
+                            {
+                                repeatCell: {
+                                    range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 },
+                                    cell: {
+                                        userEnteredFormat: {
+                                            backgroundColor: { red: 0.90, green: 0.93, blue: 0.96 },
+                                            textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 10 },
+                                            horizontalAlignment: 'LEFT',
+                                            verticalAlignment: 'MIDDLE',
+                                        },
+                                    },
+                                    fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                                },
+                            },
+                            {
+                                repeatCell: {
+                                    range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 3, endColumnIndex: 6 },
+                                    cell: {
+                                        userEnteredFormat: {
+                                            backgroundColor: { red: 0.95, green: 0.97, blue: 0.99 },
+                                            textFormat: { bold: true, fontFamily: 'Roboto', fontSize: 12 },
+                                            horizontalAlignment: 'CENTER',
+                                            verticalAlignment: 'MIDDLE',
+                                        },
+                                    },
+                                    fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+                                },
+                            },
+                            {
+                                updateDimensionProperties: {
+                                    range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+                                    properties: { pixelSize: 30 },
+                                    fields: 'pixelSize'
+                                }
+                            }
+                        ]
+                    }
+                });
+            }
+
+            console.log(`📋 REGISTRO_DIARIO: ${totalDelta} eventos registrados para ${nombre}`);
         }
 
         // 4. Actualizar el contador aparte de PROSPECTOS TOTALES en las columnas H e I
